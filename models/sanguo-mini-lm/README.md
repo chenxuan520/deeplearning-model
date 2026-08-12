@@ -42,9 +42,6 @@ QKVO 4×128² + FFN 2×128×512 + 两个 LayerNorm）。
 
 ## 训练过程详解
 
-> **模型权重不在本仓库**，按本文档流程可自行复现训练（CPU 一夜，12 epochs），
-> 或联系维护者获取。
-
 ### 1. 语料制备（`corpus/` 三份文件即三步中间产物）
 
 1. **下载**：Project Gutenberg [#23950《三國志演義》](https://www.gutenberg.org/ebooks/23950)
