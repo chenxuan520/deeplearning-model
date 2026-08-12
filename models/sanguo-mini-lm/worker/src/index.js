@@ -588,7 +588,9 @@ async function handle(request, env) {
       });
     }
 
-    return new Response('not found', { status: 404 });
+    // 未命中路由:交回静态资产(manifest.json / weights.bin / runner.js),
+    // 由外层统一补 CORS 头,供其他站点跨域 fetch 权重。
+    return env.ASSETS.fetch(request);
 }
 
 export default {
