@@ -303,8 +303,13 @@ document.getElementById('go').onclick = async () => {
 </body>
 </html>`;
 
-export default {
-  async fetch(request, env) {
+const CORS_HEADERS = {
+  'access-control-allow-origin': '*',
+  'access-control-allow-methods': 'GET, POST, OPTIONS',
+  'access-control-allow-headers': 'content-type, authorization',
+};
+
+async function handle(request, env) {
     const url = new URL(request.url);
 
     if (url.pathname === '/' && request.method === 'GET') {
@@ -423,5 +428,18 @@ export default {
     }
 
     return new Response('not found', { status: 404 });
+}
+
+export default {
+  async fetch(request, env) {
+    if (request.method === 'OPTIONS') {
+      return new Response(null, { status: 204, headers: CORS_HEADERS });
+    }
+    const resp = await handle(request, env);
+    const wrapped = new Response(resp.body, resp);
+    for (const [k, v] of Object.entries(CORS_HEADERS)) {
+      wrapped.headers.set(k, v);
+    }
+    return wrapped;
   },
 };
