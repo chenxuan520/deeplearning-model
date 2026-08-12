@@ -18,7 +18,7 @@
 models/<model-name>/
 ├── README.md   # 该模型的完整档案：配置、参数量拆解、训练过程、指标、生成样例、部署、复现命令
 ├── corpus/     # 语料（raw → 中间产物 → 训练终版，附来源与许可说明）
-├── model/      # 训练日志、指标；注意：模型权重与 checkpoint 一律【不入库】（.gitignore 拦截 *.param/*.ckpt/*.vocab/*.bin），需按手册复现训练或另行获取
+├── model/      # 训练日志与指标（模型权重、checkpoint 等二进制不入库，按手册复现或另行获取）
 └── worker/     # （可选）线上部署工程，如 Cloudflare Worker；同样不含二进制权重
 ```
 
