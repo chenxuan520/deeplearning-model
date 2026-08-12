@@ -1,0 +1,33 @@
+Training on file:demo/mini_lm/tools/data/sanguo_clean.txt (11907 samples, context 48)
+Tokenizer: utf8-char vocab_size: 3981
+Epochs: 0 -> 3 batch_size: 240 thread_num: 24 learning_rate: 0.001 warmup_epochs: 1
+Checkpoint: /tmp/opencode/mini_lm/sanguo.param.ckpt every 1 epoch(s)
+Early stop loss: 0.020000
+epoch 1/3 sample 1680/11907 loss=7.80158 recent_loss=7.41563 samples/s=4.91956 epoch_eta=34m39s total_eta=1h55m20s
+epoch 1/3 sample 3360/11907 loss=7.42588 recent_loss=6.82257 samples/s=4.9131 epoch_eta=29m0s total_eta=1h49m47s
+epoch 1/3 sample 5040/11907 loss=7.1516 recent_loss=6.48949 samples/s=4.91186 epoch_eta=23m18s total_eta=1h44m6s
+epoch 1/3 sample 6720/11907 loss=6.95614 recent_loss=6.3295 samples/s=4.93763 epoch_eta=17m31s total_eta=1h37m53s
+epoch 1/3 sample 8400/11907 loss=6.82413 recent_loss=6.30195 samples/s=4.95269 epoch_eta=11m48s total_eta=1h31m56s
+epoch 1/3 sample 9840/11907 loss=6.74148 recent_loss=6.26172 samples/s=4.89374 epoch_eta=7m2s total_eta=1h28m9s
+epoch 1/3 sample 11280/11907 loss=6.68086 recent_loss=6.25066 samples/s=4.77606 epoch_eta=2m11s total_eta=1h25m17s
+epoch 1/3 loss=6.65919 perplexity=779.919 recent_loss=6.27172 lr=0.001 elapsed=41m44s eta=1h23m28s
+Saved checkpoint: /tmp/opencode/mini_lm/sanguo.param.ckpt completed_epoch=1
+epoch 2/3 sample 960/11907 loss=6.24456 recent_loss=6.21585 samples/s=4.96503 epoch_eta=36m45s total_eta=1h19m51s
+epoch 2/3 sample 2640/11907 loss=6.24672 recent_loss=6.29585 samples/s=5.07742 epoch_eta=30m25s total_eta=1h13m22s
+epoch 2/3 sample 4080/11907 loss=6.2484 recent_loss=6.24608 samples/s=4.88521 epoch_eta=26m42s total_eta=1h8m42s
+epoch 2/3 sample 5760/11907 loss=6.24488 recent_loss=6.23284 samples/s=4.87283 epoch_eta=21m1s total_eta=1h2m47s
+epoch 2/3 sample 7440/11907 loss=6.25015 recent_loss=6.23705 samples/s=4.88509 epoch_eta=15m14s total_eta=56m48s
+epoch 2/3 sample 9120/11907 loss=6.25063 recent_loss=6.23463 samples/s=4.89615 epoch_eta=9m29s total_eta=50m52s
+epoch 2/3 sample 10800/11907 loss=6.25103 recent_loss=6.24877 samples/s=4.9128 epoch_eta=3m45s total_eta=44m55s
+epoch 2/3 loss=6.25076 perplexity=518.405 recent_loss=6.2607 lr=0.001 elapsed=1h22m7s eta=41m4s
+Saved checkpoint: /tmp/opencode/mini_lm/sanguo.param.ckpt completed_epoch=2
+epoch 3/3 sample 480/11907 loss=6.24307 recent_loss=6.24289 samples/s=4.83978 epoch_eta=39m21s total_eta=39m24s
+epoch 3/3 sample 2160/11907 loss=6.2418 recent_loss=6.20898 samples/s=4.93048 epoch_eta=32m57s total_eta=33m33s
+epoch 3/3 sample 3840/11907 loss=6.23986 recent_loss=6.22084 samples/s=4.96523 epoch_eta=27m5s total_eta=27m43s
+epoch 3/3 sample 5040/11907 loss=6.23799 recent_loss=6.23058 samples/s=4.58126 epoch_eta=24m59s total_eta=23m54s
+epoch 3/3 sample 6480/11907 loss=6.241 recent_loss=6.23857 samples/s=4.51488 epoch_eta=20m2s total_eta=19m0s
+epoch 3/3 sample 7920/11907 loss=6.24289 recent_loss=6.24197 samples/s=4.55541 epoch_eta=14m35s total_eta=13m57s
+epoch 3/3 sample 9600/11907 loss=6.24382 recent_loss=6.21644 samples/s=4.6502 epoch_eta=8m16s total_eta=8m3s
+epoch 3/3 sample 11280/11907 loss=6.2442 recent_loss=6.23705 samples/s=4.7017 epoch_eta=2m13s total_eta=2m11s
+epoch 3/3 loss=6.24456 perplexity=515.201 recent_loss=6.24573 lr=0.00055 elapsed=2h4m9s eta=0s
+Saved checkpoint: /tmp/opencode/mini_lm/sanguo.param.ckpt completed_epoch=3

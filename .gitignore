@@ -1,0 +1,12 @@
+node_modules/
+.DS_Store
+*.pyc
+.wrangler/
+
+# 模型与二进制产物一律不入库
+*.param
+*.param.*
+*.ckpt
+*.ckpt.*
+*.vocab
+*.bin
