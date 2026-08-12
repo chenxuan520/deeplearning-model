@@ -242,61 +242,222 @@ function messagesToPrompt(messages) {
 // ---------- http ----------
 
 const HTML_PAGE = `<!DOCTYPE html>
-<html lang="zh">
+<html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<title>三国迷你 LM</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三国演义 · 迷你语言模型</title>
 <style>
-  body { max-width: 680px; margin: 40px auto; font-family: sans-serif; padding: 0 16px; }
-  textarea { width: 100%; box-sizing: border-box; }
-  #out { white-space: pre-wrap; border: 1px solid #ccc; padding: 12px; min-height: 140px; margin-top: 12px; }
-  .row { margin: 8px 0; }
-  button { padding: 6px 18px; }
-  #status { color: #666; font-size: 13px; }
+  :root {
+    --paper: #f6f1e5;
+    --paper-dark: #efe7d3;
+    --ink: #2b2622;
+    --ink-light: #6b5f52;
+    --cinnabar: #a63a2b;
+    --cinnabar-deep: #8c2f22;
+    --line: #d8cdb4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper-dark);
+    color: var(--ink);
+    font-family: "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", serif;
+    line-height: 1.9;
+    padding: 40px 16px;
+  }
+  .scroll {
+    max-width: 720px;
+    margin: 0 auto;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    box-shadow: 0 2px 24px rgba(60, 45, 20, 0.14), inset 0 0 60px rgba(180, 150, 90, 0.08);
+    padding: 44px 48px 36px;
+  }
+  header { text-align: center; margin-bottom: 8px; }
+  h1 {
+    font-size: 30px; letter-spacing: 10px; margin: 0 0 4px;
+    font-weight: 600; text-indent: 10px;
+  }
+  .seal {
+    display: inline-block; margin: 10px 0 6px;
+    background: var(--cinnabar); color: #f9efe0;
+    font-size: 13px; letter-spacing: 0; line-height: 1.15;
+    padding: 6px 8px; border-radius: 3px;
+    box-shadow: 0 1px 4px rgba(140, 47, 34, 0.4);
+    writing-mode: vertical-lr;
+  }
+  .subtitle { color: var(--ink-light); font-size: 14px; margin: 6px 0 0; }
+  .divider {
+    border: none; border-top: 1px solid var(--line);
+    margin: 22px 0; position: relative;
+  }
+  .divider::after {
+    content: "◆"; position: absolute; left: 50%; top: -0.75em;
+    transform: translateX(-50%); background: var(--paper);
+    padding: 0 14px; color: var(--line); font-size: 11px;
+  }
+  .note { font-size: 13.5px; color: var(--ink-light); }
+  .note code {
+    background: var(--paper-dark); padding: 1px 6px;
+    border: 1px solid var(--line); border-radius: 3px; font-size: 12.5px;
+  }
+  label { font-size: 14px; color: var(--ink-light); }
+  textarea {
+    width: 100%; padding: 12px 14px; resize: vertical;
+    font-family: inherit; font-size: 16px; line-height: 1.8;
+    color: var(--ink); background: #fbf8ef;
+    border: 1px solid var(--line); border-radius: 2px; outline: none;
+  }
+  textarea:focus { border-color: var(--cinnabar); box-shadow: 0 0 0 2px rgba(166, 58, 43, 0.12); }
+  .controls {
+    display: flex; flex-wrap: wrap; gap: 10px 18px;
+    align-items: center; margin: 14px 0 4px;
+  }
+  .controls input[type="number"] {
+    width: 62px; padding: 5px 8px; font-family: inherit; font-size: 14px;
+    color: var(--ink); background: #fbf8ef;
+    border: 1px solid var(--line); border-radius: 2px; outline: none;
+  }
+  .controls input[type="number"]:focus { border-color: var(--cinnabar); }
+  .controls .check { display: inline-flex; align-items: center; gap: 5px; }
+  .btns { margin-left: auto; display: flex; gap: 10px; }
+  button {
+    font-family: inherit; font-size: 15px; letter-spacing: 4px; text-indent: 4px;
+    padding: 8px 26px; cursor: pointer; border-radius: 2px;
+    border: 1px solid var(--cinnabar-deep);
+    background: var(--cinnabar); color: #f9efe0;
+    transition: background 0.15s ease;
+  }
+  button:hover:not(:disabled) { background: var(--cinnabar-deep); }
+  button:disabled { opacity: 0.55; cursor: default; }
+  #stop {
+    background: transparent; color: var(--cinnabar-deep);
+    border-color: var(--line); display: none;
+  }
+  #stop:hover { background: var(--paper-dark); }
+  #status { font-size: 13px; color: var(--ink-light); min-height: 22px; }
+  #status .bar {
+    display: inline-block; vertical-align: middle;
+    width: 180px; height: 6px; background: var(--paper-dark);
+    border: 1px solid var(--line); border-radius: 3px;
+    margin-left: 8px; overflow: hidden;
+  }
+  #status .bar i { display: block; height: 100%; background: var(--cinnabar); width: 0; transition: width 0.2s; }
+  #out {
+    margin-top: 10px; padding: 22px 26px; min-height: 160px;
+    background: #fbf8ef; border: 1px solid var(--line);
+    font-size: 17px; white-space: pre-wrap; word-break: break-all;
+  }
+  #out:empty::before { content: "（此处将逐字生成）"; color: #c0b49a; }
+  #out.generating::after {
+    content: "▏"; color: var(--cinnabar);
+    animation: blink 0.9s steps(1) infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  footer { margin-top: 26px; font-size: 12.5px; color: var(--ink-light); text-align: center; }
+  footer a { color: var(--cinnabar); text-decoration: none; border-bottom: 1px dotted var(--cinnabar); }
+  details { margin-top: 14px; font-size: 13.5px; }
+  summary { cursor: pointer; color: var(--ink-light); }
+  pre {
+    background: var(--paper-dark); border: 1px solid var(--line);
+    padding: 10px 14px; overflow-x: auto; font-size: 12.5px; line-height: 1.6;
+  }
+  @media (max-width: 640px) {
+    body { padding: 0; }
+    .scroll { border: none; padding: 28px 20px; min-height: 100vh; box-shadow: none; }
+    h1 { font-size: 24px; letter-spacing: 6px; text-indent: 6px; }
+  }
 </style>
 </head>
 <body>
-<h2>三国演义 · 190 万参数迷你语言模型</h2>
-<p>模型在你浏览器里推理（约 7MB 权重，首次加载下载一次）。训练语料：《三國志演義》（Project Gutenberg 公版）。它会学三国腔续写，不会"回答问题"。</p>
-<div class="row"><textarea id="prompt" rows="2">却说曹操</textarea></div>
-<div class="row">
-  字数 <input id="num" type="number" value="50" min="1" max="500" style="width:64px">
-  temperature <input id="temp" type="number" value="0.8" step="0.1" min="0.1" max="2" style="width:64px">
-  top-k <input id="topk" type="number" value="10" min="0" style="width:56px">
-  <button id="go">生成</button>
-  <label><input id="greedy" type="checkbox"> 贪心</label>
+<div class="scroll">
+  <header>
+    <h1>三国演义</h1>
+    <div class="seal">迷你<br>语言<br>模型</div>
+    <p class="subtitle">手写 C++ 框架 · 从易经纬 · 一百八十二万参数 · 字符级续写</p>
+  </header>
+  <hr class="divider">
+  <p class="note">
+    语料取公版《三國志演義》全文（Project Gutenberg，公有领域），凡五十七万字。
+    此模型在你<strong>本机浏览器</strong>中推演，无需联网计算；权重约七兆，首次加载一次。
+    模型所学乃三国行文腔调，你开个头，它接着往下诌——莫当真事问它。
+  </p>
+  <textarea id="prompt" rows="2" placeholder="起个头，譬如：却说曹操">却说曹操</textarea>
+  <div class="controls">
+    <label>字数 <input id="num" type="number" value="80" min="1" max="500"></label>
+    <label>温度 <input id="temp" type="number" value="0.8" step="0.1" min="0.1" max="2"></label>
+    <label>top-k <input id="topk" type="number" value="10" min="0"></label>
+    <label class="check"><input id="greedy" type="checkbox"> 贪心</label>
+    <div class="btns">
+      <button id="stop">停</button>
+      <button id="go">生成</button>
+    </div>
+  </div>
+  <div id="status">模型未加载</div>
+  <div id="out"></div>
+  <details>
+    <summary>API（OpenAI 兼容，服务端推理）</summary>
+    <pre>curl https://minilm.011203.xyz/v1/chat/completions \
+  -H 'content-type: application/json' \
+  -d '{"messages":[{"role":"user","content":"话说天下大势"}],
+       "max_tokens":50,"temperature":0.8,"stream":true}'</pre>
+  </details>
+  <footer>
+    <a href="https://github.com/chenxuan520/deeplearning-model">deeplearning-model</a> ·
+    框架 <a href="https://github.com/chenxuan520/deeplearning">deeplearning</a>
+  </footer>
 </div>
-<div id="status">模型未加载</div>
-<div id="out"></div>
 <script type="module">
 import { loadModel, forward, greedyToken, sampleToken, encodePrompt } from '/runner.js';
 const out = document.getElementById('out');
 const status = document.getElementById('status');
+const goBtn = document.getElementById('go');
+const stopBtn = document.getElementById('stop');
 let model = null;
+let aborted = false;
+
 (async () => {
   try {
-    model = await loadModel((p) => { status.textContent = '权重下载中 ' + (p * 100).toFixed(0) + '%'; });
-    status.textContent = '模型就绪（约 0.3-0.8 秒/字）';
+    status.innerHTML = '权重下载中 <span class="bar"><i id="bar"></i></span>';
+    model = await loadModel((p) => {
+      const bar = document.getElementById('bar');
+      if (bar) bar.style.width = (p * 100).toFixed(0) + '%';
+    });
+    status.textContent = '模型就绪（本机推演，约 0.2-0.6 秒/字）';
   } catch (e) {
-    status.textContent = '模型加载失败: ' + e.message;
+    status.textContent = '模型加载失败：' + e.message;
   }
 })();
-document.getElementById('go').onclick = async () => {
-  if (!model) { status.textContent = '模型还在加载中…'; return; }
-  out.textContent = '';
+
+stopBtn.onclick = () => { aborted = true; };
+
+goBtn.onclick = async () => {
+  if (!model) { status.textContent = '模型尚在加载中…'; return; }
   const greedy = document.getElementById('greedy').checked;
   const temperature = +document.getElementById('temp').value || 0.8;
   const topK = +document.getElementById('topk').value || 0;
-  const num = Math.min(Math.max(1, +document.getElementById('num').value || 50), 500);
+  const num = Math.min(Math.max(1, +document.getElementById('num').value || 80), 500);
   const cur = encodePrompt(model, document.getElementById('prompt').value);
-  if (cur.length === 0) { out.textContent = '(prompt 里没有词表内的字)'; return; }
+  if (cur.length === 0) { out.textContent = ''; status.textContent = '开头里没有词表内的字（模型只识汉字与逗号句号）。'; return; }
+  aborted = false;
+  goBtn.disabled = true;
+  stopBtn.style.display = 'inline-block';
   out.textContent = '';
-  for (let i = 0; i < num; i++) {
-    const logits = forward(model, cur);
-    const next = greedy ? greedyToken(logits) : sampleToken(logits, temperature, topK, 1);
-    cur.push(next);
-    out.textContent += model.vocab[next];
-    await new Promise((r) => setTimeout(r, 0));
+  out.classList.add('generating');
+  try {
+    for (let i = 0; i < num; i++) {
+      if (aborted) break;
+      const logits = forward(model, cur);
+      const next = greedy ? greedyToken(logits) : sampleToken(logits, temperature, topK, 1);
+      cur.push(next);
+      out.textContent += model.vocab[next];
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  } finally {
+    out.classList.remove('generating');
+    goBtn.disabled = false;
+    stopBtn.style.display = 'none';
   }
 };
 </script>

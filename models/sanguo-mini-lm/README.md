@@ -4,8 +4,8 @@
 **~182 万参数**字符级中文语言模型。语料是公有领域公版书《三國志演義》全文，
 模型学会了续写半文半白的三国腔文本。
 
-- 在线网页：https://sanguo-mini-lm.011203.workers.dev
-- OpenAI 兼容 API：`POST https://sanguo-mini-lm.011203.workers.dev/v1/chat/completions`
+- 在线网页：https://minilm.011203.xyz
+- OpenAI 兼容 API：`POST https://minilm.011203.xyz/v1/chat/completions`
 
 ## 生成样例
 
@@ -134,7 +134,7 @@ cd worker && CLOUDFLARE_API_TOKEN=<token> npx wrangler deploy
 curl 示例：
 
 ```bash
-curl https://sanguo-mini-lm.011203.workers.dev/v1/chat/completions \
+curl https://minilm.011203.xyz/v1/chat/completions \
   -H 'content-type: application/json' \
   -d '{"messages":[{"role":"user","content":"话说天下大势"}],
        "max_tokens":30,"temperature":0.8,"stream":true}'

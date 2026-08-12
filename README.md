@@ -8,7 +8,7 @@
 
 | 模型 | 任务 | 参数量 | 语料 | 指标 | 在线演示 |
 |------|------|--------|------|------|----------|
-| [sanguo-mini-lm](models/sanguo-mini-lm/) | 字符级中文语言模型（utf8-char） | ~182 万 | 《三國志演義》简体清洗版 57 万字（Gutenberg #23950，公有领域） | loss 3.62 / ppl 37.2 | [网页 & OpenAI 兼容 API](https://sanguo-mini-lm.011203.workers.dev) |
+| [sanguo-mini-lm](models/sanguo-mini-lm/) | 字符级中文语言模型（utf8-char） | ~182 万 | 《三國志演義》简体清洗版 57 万字（Gutenberg #23950，公有领域） | loss 3.62 / ppl 37.2 | [网页 & OpenAI 兼容 API](https://minilm.011203.xyz) |
 
 ## 目录约定
 
