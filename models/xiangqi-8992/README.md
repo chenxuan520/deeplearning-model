@@ -273,8 +273,8 @@ https://github.com/chenxuan520/deeplearning-model/releases/tag/xiangqi-8992-v1
 
 Release 包含：
 
-- `steps_00010.model.bin`
-- `steps_00010.optimizer.bin`
+- `xiangqi-8992.model.bin`
+- `xiangqi-8992.optimizer.bin`
 - `xq_resnet_match_joint`
 - `source_snapshot.tar.gz`
 - `PACKAGE_SHA256SUMS`
