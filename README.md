@@ -9,6 +9,7 @@
 | 模型 | 任务 | 参数量 | 语料 | 指标 | 在线演示 |
 |------|------|--------|------|------|----------|
 | [sanguo-mini-lm](models/sanguo-mini-lm/) | 字符级中文语言模型（utf8-char） | ~182 万 | 《三國志演義》简体清洗版 57 万字（Gutenberg #23950，公有领域） | loss 3.62 / ppl 37.2 | [网页 & OpenAI 兼容 API](https://minilm.011203.xyz) |
+| [xiangqi-8992](models/xiangqi-8992/) | 象棋 policy/value ResNet + PUCT | 484 万 | 授权/自有/公开象棋棋谱 + 16 局 512-PUCT 自博弈 | vs 8991: 24-13-13；gentle: 0-12-0 | 本地 8992 端口；Cloudflare Worker 不适合直接推理 |
 
 ## 目录约定
 

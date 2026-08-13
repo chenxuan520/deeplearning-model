@@ -1,0 +1,36 @@
+{
+  "id": "xiangqi-8992",
+  "architecture": "PolicyValueResNet-192x6",
+  "input": {"planes": 30, "height": 10, "width": 9},
+  "actions": 2086,
+  "parameters": 4841449,
+  "optimizerTrainableElements": 4838947,
+  "modelBytes": 19386644,
+  "optimizerBytes": 38712840,
+  "modelSha256": "574708cd51352c5b3087dd3b6ecc601e1f3aed2162217c6c1dc746a5141303e2",
+  "runtime": {
+    "type": "C++ full-tree PUCT",
+    "simulations": 128,
+    "cpuct": 1.5,
+    "jointNetwork": true,
+    "handwrittenRouting": false,
+    "binarySha256": "b224047b568107d8f4230be04314f7acb6476697b38fae6594ab3004246e80bc"
+  },
+  "training": {
+    "lineage": "frozen 8991 policy/value parents -> fused 128x4 -> cross step5 -> 512-PUCT selfplay -> widen 192x6 -> growth-policy step25 -> growth-value-head step10",
+    "completeBranchArtifactsVerified": 70,
+    "finalStageArtifactsVerified": 10
+  },
+  "evaluation": {
+    "versus8991": {"wins": 24, "losses": 13, "draws": 13, "score": 0.61, "redScore": 0.52, "blackScore": 0.7},
+    "gentleMultiNoise": {"wins": 0, "losses": 12, "draws": 0, "score": 0}
+  },
+  "deploymentMeasurements": {
+    "loadedCppRssKiB": 42884,
+    "initialSearchPeakCppRssKiB": 61868,
+    "coldLoadAndExitSeconds": 0.097,
+    "initialPositionSearchSeconds": 3.3,
+    "initialPositionNetworkEvaluations": 129
+  },
+  "sourceOfTruth": "/data00/home/lingchen.judy/temp/chenxuanweb/game/repro/8992/"
+}
