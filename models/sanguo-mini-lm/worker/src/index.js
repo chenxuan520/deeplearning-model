@@ -590,7 +590,16 @@ async function handle(request, env) {
 
     // 未命中路由:交回静态资产(manifest.json / weights.bin / runner.js),
     // 由外层统一补 CORS 头,供其他站点跨域 fetch 权重。
-    return env.ASSETS.fetch(request);
+    const assetResp = await env.ASSETS.fetch(request);
+    if (url.pathname === '/weights.bin') {
+      // 权重基本不变:给一年 immutable 缓存,刷新/重开浏览器都直接命中,
+      // 不再回源验证。换权重时需改文件名(如 weights.v2.bin)或加 query 版本号。
+      const cached = new Response(assetResp.body, assetResp);
+      cached.headers.set(
+          'cache-control', 'public, max-age=31536000, immutable');
+      return cached;
+    }
+    return assetResp;
 }
 
 export default {
