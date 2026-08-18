@@ -1,10 +1,10 @@
 {
   "format": "XQPVRN01",
   "version": 1,
-  "file": "https://azgomoku.011203.xyz/champion_final-348b1b34.net",
+  "file": "https://azgomoku.011203.xyz/iter330-c4f41fcb.net",
   "engine": "https://azgomoku.011203.xyz/alphazero-gomoku-b5cd1abe.js",
   "training_curve": "https://azgomoku.011203.xyz/policy_loss_analysis-iter330-25dc9de5.png",
-  "sha256": "348b1b3448ded9f32d7738cb31cbbe3739c819c54e2b20b29e266dc4780345f4",
+  "sha256": "c4f41fcba6acd9f0956a5f64c0a80762fc21b9871b5ef429d3335ecfa47275dc",
   "size_bytes": 770380,
   "parameter_count": 191853,
   "config": {
