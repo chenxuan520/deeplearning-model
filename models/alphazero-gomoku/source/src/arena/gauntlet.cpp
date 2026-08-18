@@ -64,7 +64,7 @@ int PlayOneGame(Evaluator &evaluator, JsOpponent &opponent,
 std::vector<GauntletResult> RunGauntlet(
     deeplearning::PolicyValueResNet &net, const std::vector<int> &levels,
     int games_per_color, int workers, const MctsConfig &mcts_config,
-    int max_moves, int seed) {
+    int max_moves, int seed, GauntletColor color) {
   MctsConfig quiet = mcts_config;
   quiet.dirichlet_epsilon_ = 0.0f;
 
@@ -80,8 +80,10 @@ std::vector<GauntletResult> RunGauntlet(
   std::vector<Job> jobs;
   for (int level : levels) {
     for (int i = 0; i < games_per_color; ++i) {
-      jobs.push_back({level, true, 0});
-      jobs.push_back({level, false, 0});
+      if (color != GauntletColor::WHITE_ONLY)
+        jobs.push_back({level, true, 0});
+      if (color != GauntletColor::BLACK_ONLY)
+        jobs.push_back({level, false, 0});
     }
   }
   for (std::size_t i = 0; i < jobs.size(); ++i) jobs[i].job_index = (int)i;

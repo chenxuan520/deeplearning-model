@@ -2,6 +2,13 @@
 
 > 持续滚动更新，最新在最上面。结构化训练数据看 `runtime/train.log`（JSON 行），这份是人的思考/结论/问题记录。
 
+## 2026-08-18 · 稳定冠军 vs L7 后手搜索预算阈值
+
+- 固定模型 `runtime/champion_final.net`，仅测 L7、模型执白、每档 20 局；关闭根噪声、根访问次数贪心落子。
+- 24 sims：0 胜 / 20 负（0%）；48 sims：0/20（0%）；96 sims：20 胜 / 0 负（100%）。
+- 同一权重在 48→96 sims 之间出现明显战术搜索阈值；低预算 Web 试玩速度快，但不能代表正式 600/800-sim 棋力。
+- 复现：`./bin/alphazero gauntlet --model runtime/champion_final.net --levels 7 --games 20 --workers 8 --sims N --color white`。
+
 ## 2026-08-18 · iter337 / 48-sim 全谱擂台
 
 - 冻结 `runtime/gauntlet_iter337_sims48.net`；训练继续运行。L1–L7、每色 10 局、48 sims，共 140 局。

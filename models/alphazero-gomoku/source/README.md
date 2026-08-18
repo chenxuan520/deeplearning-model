@@ -10,6 +10,10 @@
 ```bash
 ./bin/alphazero gauntlet --model ../public/champion_final-348b1b34.net \
     --levels 1,2,3,4,5,6,7 --games 10 --workers 24 --sims 800
+
+# 只测模型执白/黑(例如 L7 后手 20 局)
+./bin/alphazero gauntlet --model ../public/champion_final-348b1b34.net \
+    --levels 7 --games 20 --workers 8 --sims 96 --color white
 ```
 
 训练栈完全建立在 deeplearning 仓库的 WIP 组件副本之上（`lib/` 下：

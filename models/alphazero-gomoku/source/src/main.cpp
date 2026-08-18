@@ -54,7 +54,8 @@ void PrintUsage() {
       "  serve  [--model FILE] [--port 8765] [--sims 800] [--threads 24]\n"
       "           (HTTP move API for the web frontend; CORS open)\n"
       "  gauntlet [--model FILE] [--games 10] [--workers 8] [--levels 6,7]\n"
-      "           (acceptance vs game-old JS levels 1-7, model both colors)\n"
+      "           [--color both|black|white]\n"
+      "           (acceptance vs game-old JS levels 1-7)\n"
       "  bench  [--trunk N] [--blocks N] [--batch B] [--threads T] [--iters N]\n"
       "  bench  --concurrent N [--iters N]\n"
       "  info\n"
@@ -239,6 +240,8 @@ int CmdGauntlet(int argc, char **argv) {
   std::string model = "runtime/best.net";
   std::vector<int> levels = {1, 2, 3, 4, 5, 6, 7};
   int games = 10, workers = 8, sims = 100, max_moves = 225, seed = 99;
+  az::GauntletColor color = az::GauntletColor::BOTH;
+  const char *color_name = "both";
   for (int i = 2; i + 1 < argc; i += 2) {
     if (!std::strcmp(argv[i], "--model")) model = argv[i + 1];
     if (!std::strcmp(argv[i], "--games")) games = std::atoi(argv[i + 1]);
@@ -247,6 +250,19 @@ int CmdGauntlet(int argc, char **argv) {
     if (!std::strcmp(argv[i], "--max-moves"))
       max_moves = std::atoi(argv[i + 1]);
     if (!std::strcmp(argv[i], "--seed")) seed = std::atoi(argv[i + 1]);
+    if (!std::strcmp(argv[i], "--color")) {
+      color_name = argv[i + 1];
+      if (!std::strcmp(color_name, "black"))
+        color = az::GauntletColor::BLACK_ONLY;
+      else if (!std::strcmp(color_name, "white"))
+        color = az::GauntletColor::WHITE_ONLY;
+      else if (!std::strcmp(color_name, "both"))
+        color = az::GauntletColor::BOTH;
+      else {
+        std::fprintf(stderr, "invalid --color (expected both|black|white)\n");
+        return 1;
+      }
+    }
     if (!std::strcmp(argv[i], "--levels")) {
       levels.clear();
       std::string spec = argv[i + 1];
@@ -269,10 +285,10 @@ int CmdGauntlet(int argc, char **argv) {
   az::MctsConfig mcts;
   mcts.simulation_num_ = sims;
   mcts.dirichlet_epsilon_ = 0.0f;
-  std::printf("gauntlet: %s vs %zu levels x %d games per color\n",
-              model.c_str(), levels.size(), games);
+  std::printf("gauntlet: %s vs %zu levels x %d games, color=%s\n",
+              model.c_str(), levels.size(), games, color_name);
   auto results = az::RunGauntlet(net, levels, games, workers, mcts, max_moves,
-                                 seed);
+                                 seed, color);
   std::printf("\nlevel | black W/L/D (rate) | white W/L/D (rate)\n");
   for (const auto &r : results) {
     const int black_games = r.black_wins + r.black_losses + r.black_draws;
