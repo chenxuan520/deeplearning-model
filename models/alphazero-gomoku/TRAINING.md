@@ -1,10 +1,10 @@
 # AlphaZero 五子棋训练档案
 
-这份模型完全由 **AlphaZero/AlphaGo Zero 风格的纯自对弈**训练得到：
+这份模型的状态、π 与 z 完全由 **AlphaZero/AlphaGo Zero 风格的自对弈**产生：
 
 - 不使用棋谱监督学习；
 - 不使用旧站 AI 的落子作为标签；
-- 不把启发式估值注入 MCTS；
+- 不把启发式估值注入 MCTS；hard curriculum 会用手写三/四连检测器重采样自对弈错题,但不提供动作/价值标签；
 - `game-old/gobang-web` 的 1–7 档 AI 只作为最终考官。
 
 ## 1. 任务与规则
@@ -97,9 +97,10 @@ score(s,a) = Q(s,a) + c_puct · P(s,a) · sqrt(N(s)) / (1 + N(s,a))
 这不是启发式打分，只是动作空间剪枝。原先约 217 个合法点分摊 100 次模拟，
 大部分边从未访问，根访问策略 π 近似噪声；剪枝后候选约 25–40 个，训练才进入正轨。
 
-### Hard-negative mining
+### Hard-negative mining（领域特定 curriculum）
 
-Replay Buffer 中对手已有四连，或败局中对手已有三连的局面进入 hard set。
+Replay Buffer 中对手已有四连，或败局中对手已有三连的局面进入 hard set。这一步使用手写棋形检测器选择“复习哪些题”，
+因此不是对 AlphaGo Zero 仅给规则配方的逐字复刻；但 π/z 仍全部来自自对弈搜索与终局。
 每个 batch 约 30% 来自 hard set，重点补防守长尾。
 
 ### 残局做种自对弈
@@ -124,13 +125,14 @@ Replay Buffer 中对手已有四连，或败局中对手已有三连的局面进
 | 温度窗口过长 | 半局都是探索噪声 | `temp_moves 12→6` |
 | PUCT 过度广搜 | 防守线访问不够 | `c_puct 1.5→0.8`（训练） |
 | BN 状态没复制 | worker 推理漂移 | 参数之外显式复制 running mean/variance |
+| cache key 漏上一手 | 相同棋盘不同输入错误命中 | key 加 current player + last_action + board |
 
 搜索模拟数逐步从 100→200→300→500→600。64ch×6block（56 万参数）实验吞吐
 仅约 189 eval/s，远低于 32ch×4block 的约 884 eval/s，最终选择小网高频迭代。
 
 ## 7. 训练结果
 
-稳定验收冠军 `champion_final.net`（600 sims，10 局/颜色）：
+稳定验收冠军 `champion_final-348b1b34.net`（600 sims，10 局/颜色）：
 
 | 旧站档位 | 黑棋 | 白棋 |
 |---|---:|---:|
@@ -150,8 +152,8 @@ Replay Buffer 中对手已有四连，或败局中对手已有三连的局面进
 Cloudflare 仅静态托管参数与 JS：
 
 - `model.json`
-- `champion_final.net`
-- `alphazero-gomoku.js`
+- `champion_final-348b1b34.net`
+- `alphazero-gomoku-b5cd1abe.js`
 
 浏览器端直接解析 C++ `.net` 文件，运行 Conv2D、BN、残差网络、策略/价值双头及
 PUCT MCTS。没有服务器前向计算。
@@ -171,6 +173,23 @@ node tools/test_parity.cjs
 ## 9. 训练记录
 
 - `training/TRAINING_NOTES.md`：完整巡检、故障与调参决策；
-- `training/policy_loss_analysis.png`：loss 点、滑动均线、晋级线与拟合；
+- `training/policy_loss_analysis.png`：截至 iter330 的 loss 点、滑动均线、晋级线与拟合；
 - `training/policy_loss_history.csv`：逐轮原始数据；
 - `training/policy_loss_fit.json`：拟合参数。
+
+## 10. 完整源码复现
+
+`source/` 是本次独立项目的源码快照，不依赖 PyTorch/TensorFlow：
+
+```bash
+cmake -S source -B source/build -DCMAKE_BUILD_TYPE=Release
+cmake --build source/build -j
+source/bin/test_az                         # 4100 checks, 0 failures
+source/bin/alphazero info
+```
+
+浏览器前向与 C++ 对齐：
+
+```bash
+AZ_PROBE="$PWD/source/bin/az_model_probe" node tools/test_parity.cjs
+```

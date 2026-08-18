@@ -4,12 +4,19 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const AZ = require("../public/alphazero-gomoku.js");
+const AZ = require("../public/alphazero-gomoku-b5cd1abe.js");
 
 const ROOT = path.resolve(__dirname, "..");
-const MODEL = path.join(ROOT, "public", "champion_final.net");
-const PROBE = process.env.AZ_PROBE ||
-  "/data00/home/lingchen.judy/self/alphazero-gomoku/bin/az_model_probe";
+const MODEL = path.join(ROOT, "public", "champion_final-348b1b34.net");
+const PROBE_CANDIDATES = [
+  process.env.AZ_PROBE,
+  path.join(ROOT, "source", "bin", "az_model_probe"),
+  "/data00/home/lingchen.judy/self/alphazero-gomoku/bin/az_model_probe",
+].filter(Boolean);
+const PROBE = PROBE_CANDIDATES.find((candidate) => fs.existsSync(candidate));
+if (!PROBE) {
+  throw new Error("az_model_probe not found; build source/ or set AZ_PROBE");
+}
 
 async function main() {
   const bytes = fs.readFileSync(MODEL);

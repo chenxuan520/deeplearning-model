@@ -1,8 +1,9 @@
 {
   "format": "XQPVRN01",
   "version": 1,
-  "file": "https://alphazero-gomoku-model.011203.workers.dev/champion_final.net",
-  "engine": "https://alphazero-gomoku-model.011203.workers.dev/alphazero-gomoku.js",
+  "file": "https://azgomoku.011203.xyz/champion_final-348b1b34.net",
+  "engine": "https://azgomoku.011203.xyz/alphazero-gomoku-b5cd1abe.js",
+  "training_curve": "https://azgomoku.011203.xyz/policy_loss_analysis-iter330-25dc9de5.png",
   "sha256": "348b1b3448ded9f32d7738cb31cbbe3739c819c54e2b20b29e266dc4780345f4",
   "size_bytes": 770380,
   "parameter_count": 191853,

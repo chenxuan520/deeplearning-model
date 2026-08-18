@@ -11,9 +11,23 @@ function withHeaders(response, requestUrl) {
   for (const [key, value] of Object.entries(CORS_HEADERS)) {
     wrapped.headers.set(key, value);
   }
-  if (requestUrl.pathname.endsWith(".net")) {
+  if (!response.ok) {
+    wrapped.headers.set("cache-control", "no-store");
+    wrapped.headers.set("content-type", "text/plain; charset=utf-8");
+    return wrapped;
+  }
+  if (response.ok && (requestUrl.pathname.endsWith(".net") ||
+      requestUrl.pathname.endsWith(".js") ||
+      requestUrl.pathname.endsWith(".png"))) {
     wrapped.headers.set("cache-control", IMMUTABLE);
-    wrapped.headers.set("content-type", "application/octet-stream");
+    wrapped.headers.set(
+      "content-type",
+      requestUrl.pathname.endsWith(".js")
+        ? "application/javascript; charset=utf-8"
+        : requestUrl.pathname.endsWith(".png")
+          ? "image/png"
+          : "application/octet-stream",
+    );
   } else if (requestUrl.pathname.endsWith(".json")) {
     wrapped.headers.set("cache-control", "public, max-age=300");
     wrapped.headers.set("content-type", "application/json; charset=utf-8");

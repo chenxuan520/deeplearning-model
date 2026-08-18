@@ -2,6 +2,13 @@
 
 > 持续滚动更新，最新在最上面。结构化训练数据看 `runtime/train.log`（JSON 行），这份是人的思考/结论/问题记录。
 
+## 2026-08-18 · last-move 缓存键修复
+
+- 浏览器移植审查发现：网络输入第 3 平面包含上一手，但 `EvalCache` key 只含行棋方与棋盘，导致相同棋盘/不同上一手错误碰撞；hard curriculum 从 replay 重构局面时也把上一手清成 -1。
+- 修复：cache key 纳入 `last_action` 并对完整 key 做 64 分片哈希；残局从 sample plane2 恢复唯一上一手。
+- 新增缓存碰撞与 `SetState(last_action)` 编码测试；当前 **4100 checks, 0 failed**。
+- iter332/step65680 是修复前最后完整 checkpoint；watchdog 已用修复后二进制从该点续训。
+
 ## 2026-08-12 · 修复后的正轨期（从 iter 13 起）
 
 ### 背景：发现并修复了一个致命机制 bug

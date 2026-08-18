@@ -156,6 +156,9 @@
     for (let row = 0; row < height; row++) {
       for (let col = 0; col < width; col++) {
         const outBase = (row * width + col) * outChannels;
+        // Every convolution in PolicyValueResNet is initialized with
+        // use_bias=false.  The serializer still writes zero-filled bias
+        // vectors, but C++ inference ignores them.
         for (let oc = 0; oc < outChannels; oc++) out[outBase + oc] = norm.bias[oc];
         let kernelPosition = 0;
         for (let ic = 0; ic < inChannels; ic++) {
@@ -354,6 +357,9 @@
     expand(root, model, cloneState(rootState));
 
     for (let sim = 0; sim < simulations; sim++) {
+      if (options.shouldStop && options.shouldStop()) {
+        return { cancelled: true, action: -1, visits: [], root };
+      }
       const state = cloneState(rootState);
       let node = root;
       const path = [];
@@ -411,7 +417,14 @@
     const manifest = await manifestResponse.json();
     const weightsResponse = await fetch(manifest.file);
     assert(weightsResponse.ok, `weights HTTP ${weightsResponse.status}`);
-    const model = parseModel(await weightsResponse.arrayBuffer());
+    const buffer = await weightsResponse.arrayBuffer();
+    if (manifest.sha256) {
+      assert(global.crypto && global.crypto.subtle, "WebCrypto SHA-256 support required");
+      const digest = await global.crypto.subtle.digest("SHA-256", buffer);
+      const actual = Array.from(new Uint8Array(digest), (value) => value.toString(16).padStart(2, "0")).join("");
+      assert(actual === manifest.sha256, `weights SHA-256 mismatch: ${actual}`);
+    }
+    const model = parseModel(buffer);
     model.manifest = manifest;
     return model;
   }
