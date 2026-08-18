@@ -107,7 +107,7 @@ def exact_train_pids():
     return pids
 
 
-def parse_gauntlet(output: str):
+def parse_gauntlet(output: str, expected_levels):
     rows = []
     pat = re.compile(
         r"^\s*(\d+)\s*\|\s*(\d+)\s*/\s*(\d+)\s*/\s*(\d+)\s*"
@@ -118,7 +118,8 @@ def parse_gauntlet(output: str):
         m = pat.match(line)
         if m:
             rows.append(tuple(map(int, m.groups())))
-    passed = len(rows) == 7 and all(
+    row_levels = [row[0] for row in rows]
+    passed = row_levels == list(expected_levels) and all(
         black_wins == 10 and black_losses == 0 and black_draws == 0
         and white_wins >= 8
         for _, black_wins, black_losses, black_draws,
@@ -127,17 +128,19 @@ def parse_gauntlet(output: str):
     return passed, rows
 
 
-def run_gauntlet(candidate: Path, index: int):
+def run_gauntlet_stage(candidate: Path, index: int, levels, label: str):
     cmd = [
         "taskset", "-c", "56-63", "./bin/alphazero", "gauntlet",
         "--model", str(candidate),
-        "--levels", "1,2,3,4,5,6,7",
+        "--levels", ",".join(map(str, levels)),
         "--games", "10",
         "--workers", "8",
         "--sims", "600",
         "--seed", str(9000 + index),
     ]
-    write_log(f"full-spectrum window {index}/3 start: {' '.join(cmd)}")
+    write_log(
+        f"full-spectrum window {index}/3 stage={label} start: {' '.join(cmd)}"
+    )
     result = subprocess.run(
         cmd,
         cwd=ROOT,
@@ -147,14 +150,29 @@ def run_gauntlet(candidate: Path, index: int):
         timeout=GAUNTLET_TIMEOUT_SEC,
         check=False,
     )
-    output_path = RUNTIME / f"plateau_gauntlet_{candidate.stem}_{index}.log"
+    output_path = RUNTIME / (
+        f"plateau_gauntlet_{candidate.stem}_{index}_{label}.log"
+    )
     output_path.write_text(result.stdout, encoding="utf-8")
-    passed, rows = parse_gauntlet(result.stdout)
+    passed, rows = parse_gauntlet(result.stdout, levels)
     write_log(
-        f"full-spectrum window {index}/3 done: rc={result.returncode} "
-        f"passed={passed} rows={rows}"
+        f"full-spectrum window {index}/3 stage={label} done: "
+        f"rc={result.returncode} passed={passed} rows={rows}"
     )
     return result.returncode == 0 and passed
+
+
+def run_full_spectrum_window(candidate: Path, index: int):
+    # L7 is a 200-simulation MCTS opponent and dominates wall time.  Keep the
+    # hard condition unchanged, but fail fast on levels 1-6 before paying the
+    # L7 cost.  A passing window still covers every level 1-7 with the original
+    # 10-games-per-color and 600-simulation model budget.
+    if not run_gauntlet_stage(candidate, index, range(1, 7), "l1-l6"):
+        write_log(
+            f"full-spectrum window {index}/3 short-circuited before L7"
+        )
+        return False
+    return run_gauntlet_stage(candidate, index, [7], "l7")
 
 
 def save_state(state):
@@ -223,7 +241,7 @@ def main():
             streak = 0
             for index in range(1, 4):
                 try:
-                    passed = run_gauntlet(candidate, index)
+                    passed = run_full_spectrum_window(candidate, index)
                 except (subprocess.TimeoutExpired, OSError) as exc:
                     write_log(f"full-spectrum window {index}/3 failed: {exc}")
                     passed = False

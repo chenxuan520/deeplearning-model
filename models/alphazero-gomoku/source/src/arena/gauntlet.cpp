@@ -65,9 +65,6 @@ std::vector<GauntletResult> RunGauntlet(
     deeplearning::PolicyValueResNet &net, const std::vector<int> &levels,
     int games_per_color, int workers, const MctsConfig &mcts_config,
     int max_moves, int seed, GauntletColor color) {
-  MctsConfig quiet = mcts_config;
-  quiet.dirichlet_epsilon_ = 0.0f;
-
   std::vector<GauntletResult> results;
   std::mutex results_mutex;
 
@@ -99,21 +96,24 @@ std::vector<GauntletResult> RunGauntlet(
     config.thread_num_ = 1;
     evaluator.Init(config);
     AssignWeights(evaluator.net(), net);
-    std::mt19937 rng(static_cast<unsigned>(seed * 7919u + worker_index));
-
     while (true) {
       const int job_index = next_job.fetch_add(1);
       if (job_index >= static_cast<int>(jobs.size())) {
         break;
       }
       const Job &job = jobs[job_index];
+      // Per-game seed makes root-noise streams identical across models and
+      // independent of worker scheduling.  This matters for fair A/B sweeps.
+      std::mt19937 game_rng(
+          static_cast<unsigned>(seed * 7919u + job.job_index));
       JsOpponent opponent(job.level);
       if (!opponent.Start()) {
         outcomes[job_index] = 0; // couldn't start: treat as draw, note on log
         std::fprintf(stderr, "[gauntlet] failed to start js engine\n");
       } else {
-        outcomes[job_index] = PlayOneGame(evaluator, opponent, quiet,
-                                          job.model_black, max_moves, rng);
+        outcomes[job_index] = PlayOneGame(evaluator, opponent, mcts_config,
+                                          job.model_black, max_moves,
+                                          game_rng);
         opponent.Stop();
       }
       const int done = finished.fetch_add(1) + 1;

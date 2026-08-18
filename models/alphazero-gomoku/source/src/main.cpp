@@ -50,11 +50,12 @@ void PrintUsage() {
       "  train  (AlphaZero loop: self-play + train + gate; see options below)\n"
       "  eval   --model FILE [--games 20] [--sims 100] [--workers 8]\n"
       "  arena  --model-a FILE --model-b FILE [--games 20] [--sims 100]\n"
+      "         [--workers 8] [--temp-moves 0]\n"
       "  play   [--model FILE] [--sims 100]  (you play white, stdin \"row col\"\n"
       "  serve  [--model FILE] [--port 8765] [--sims 800] [--threads 24]\n"
       "           (HTTP move API for the web frontend; CORS open)\n"
       "  gauntlet [--model FILE] [--games 10] [--workers 8] [--levels 6,7]\n"
-      "           [--color both|black|white]\n"
+      "           [--color both|black|white] [--dir-eps 0] [--dir-alpha .3]\n"
       "           (acceptance vs game-old JS levels 1-7)\n"
       "  bench  [--trunk N] [--blocks N] [--batch B] [--threads T] [--iters N]\n"
       "  bench  --concurrent N [--iters N]\n"
@@ -207,6 +208,7 @@ int CmdEval(int argc, char **argv) {
 int CmdArena(int argc, char **argv) {
   std::string model_a = "runtime/latest.net", model_b = "runtime/best.net";
   int games = 20, sims = 100, workers = 8, max_moves = 200, seed = 7;
+  int temp_moves = 0;
   for (int i = 2; i + 1 < argc; i += 2) {
     if (!std::strcmp(argv[i], "--model-a")) model_a = argv[i + 1];
     if (!std::strcmp(argv[i], "--model-b")) model_b = argv[i + 1];
@@ -216,6 +218,8 @@ int CmdArena(int argc, char **argv) {
     if (!std::strcmp(argv[i], "--max-moves"))
       max_moves = std::atoi(argv[i + 1]);
     if (!std::strcmp(argv[i], "--seed")) seed = std::atoi(argv[i + 1]);
+    if (!std::strcmp(argv[i], "--temp-moves"))
+      temp_moves = std::atoi(argv[i + 1]);
   }
   PolicyValueResNet a, b;
   if (!LoadNet(model_a, a) || !LoadNet(model_b, b)) return 1;
@@ -223,8 +227,7 @@ int CmdArena(int argc, char **argv) {
   mcts.simulation_num_ = sims;
   mcts.dirichlet_epsilon_ = 0.0f;
   auto stats =
-      az::RunDuel(a, b, mcts, games, workers, /*temperature_move_cutoff=*/0,
-                  max_moves, seed);
+      az::RunDuel(a, b, mcts, games, workers, temp_moves, max_moves, seed);
   const int decisive = stats.a_wins + stats.b_wins;
   std::printf("arena %s vs %s: A %s  (rate=%.2f over %d decisive)\n",
               model_a.c_str(), model_b.c_str(), ResultText(stats),
@@ -240,6 +243,7 @@ int CmdGauntlet(int argc, char **argv) {
   std::string model = "runtime/best.net";
   std::vector<int> levels = {1, 2, 3, 4, 5, 6, 7};
   int games = 10, workers = 8, sims = 100, max_moves = 225, seed = 99;
+  float dir_eps = 0.0f, dir_alpha = 0.3f;
   az::GauntletColor color = az::GauntletColor::BOTH;
   const char *color_name = "both";
   for (int i = 2; i + 1 < argc; i += 2) {
@@ -250,6 +254,10 @@ int CmdGauntlet(int argc, char **argv) {
     if (!std::strcmp(argv[i], "--max-moves"))
       max_moves = std::atoi(argv[i + 1]);
     if (!std::strcmp(argv[i], "--seed")) seed = std::atoi(argv[i + 1]);
+    if (!std::strcmp(argv[i], "--dir-eps"))
+      dir_eps = static_cast<float>(std::atof(argv[i + 1]));
+    if (!std::strcmp(argv[i], "--dir-alpha"))
+      dir_alpha = static_cast<float>(std::atof(argv[i + 1]));
     if (!std::strcmp(argv[i], "--color")) {
       color_name = argv[i + 1];
       if (!std::strcmp(color_name, "black"))
@@ -284,7 +292,8 @@ int CmdGauntlet(int argc, char **argv) {
   }
   az::MctsConfig mcts;
   mcts.simulation_num_ = sims;
-  mcts.dirichlet_epsilon_ = 0.0f;
+  mcts.dirichlet_epsilon_ = dir_eps;
+  mcts.dirichlet_alpha_ = dir_alpha;
   std::printf("gauntlet: %s vs %zu levels x %d games, color=%s\n",
               model.c_str(), levels.size(), games, color_name);
   auto results = az::RunGauntlet(net, levels, games, workers, mcts, max_moves,

@@ -9,7 +9,8 @@
 复现验收：
 ```bash
 ./bin/alphazero gauntlet --model ../public/champion_final-348b1b34.net \
-    --levels 1,2,3,4,5,6,7 --games 10 --workers 24 --sims 800
+    --levels 1,2,3,4,5,6,7 --games 10 --workers 24 --sims 800 \
+    --dir-eps 0
 
 # 只测模型执白/黑(例如 L7 后手 20 局)
 ./bin/alphazero gauntlet --model ../public/champion_final-348b1b34.net \
@@ -35,7 +36,8 @@
   （权重衰减只作用于 conv/linear 权重，BN/bias 不衰减）。
 - **数据增广**：棋盘 8 对称（4 旋转 × 镜像），采样时随机取一种同时变换平面与策略目标。
 - **评估缓存**：自对弈同轮内共享局面哈希缓存（己方/对方子布局 → policy/value），
-  20+ 并行对局下开局重复局面直接命中，以内存换 CPU。权重更新即失效。
+  键包含当前行棋方、上一手位置和完整棋盘；20+ 并行对局下开局重复局面直接
+  命中，以内存换 CPU。权重更新即失效。
 
 每轮结构（`train` 命令的默认节奏）：
 
@@ -70,7 +72,12 @@ cd .. && ./bin/test_az        # 4100 checks, 0 failed
 ./bin/alphazero eval --model runtime/best.net --games 20 --sims 100 --workers 8
 
 # 两个模型打擂台
-./bin/alphazero arena --model-a runtime/latest.net --model-b runtime/best.net
+./bin/alphazero arena --model-a runtime/latest.net --model-b runtime/best.net \
+    --games 50 --sims 48 --temp-moves 6
+
+# 相同逐局根噪声的模型 vs JS 档位横评
+./bin/alphazero gauntlet --model runtime/best.net --levels 1,2,3,4,5,6 \
+    --games 25 --sims 48 --dir-eps .25 --dir-alpha .3 --seed 4242
 
 # 人机对战（你是白棋 O，输入 "行 列"）
 ./bin/alphazero play --model runtime/best.net --sims 100
