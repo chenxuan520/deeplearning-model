@@ -10,3 +10,7 @@ node_modules/
 *.ckpt.*
 *.vocab
 *.bin
+*.net
+
+# Explicitly published small browser models under models/ are allowed.
+!models/alphazero-gomoku/public/champion_final.net

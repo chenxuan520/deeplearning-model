@@ -1,0 +1,28 @@
+{
+  "format": "XQPVRN01",
+  "version": 1,
+  "file": "https://alphazero-gomoku-model.011203.workers.dev/champion_final.net",
+  "engine": "https://alphazero-gomoku-model.011203.workers.dev/alphazero-gomoku.js",
+  "sha256": "348b1b3448ded9f32d7738cb31cbbe3739c819c54e2b20b29e266dc4780345f4",
+  "size_bytes": 770380,
+  "parameter_count": 191853,
+  "config": {
+    "input_channels": 4,
+    "board_height": 15,
+    "board_width": 15,
+    "trunk_channels": 32,
+    "residual_blocks": 4,
+    "policy_channels": 2,
+    "policy_size": 225,
+    "value_channels": 1,
+    "value_hidden_dim": 64,
+    "batch_norm_epsilon": 0.00001
+  },
+  "input_planes": [
+    "current_player_stones",
+    "opponent_stones",
+    "last_move",
+    "black_to_move"
+  ],
+  "rules": "15x15 freestyle gomoku; five-or-more wins; no forbidden moves"
+}
