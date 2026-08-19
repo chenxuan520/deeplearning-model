@@ -33,7 +33,9 @@ public:
   // Applies action (cell index 0..224). Returns false for illegal actions.
   bool Apply(int action);
 
-  bool IsLegal(int action) const { return board_[action] == 0; }
+  bool IsLegal(int action) const {
+    return action >= 0 && action < kActionNum && board_[action] == 0;
+  }
 
   // Direct state injection (used to resume mid-game positions from replay
   // samples when curriculum-seeding self-play). Not for normal play.

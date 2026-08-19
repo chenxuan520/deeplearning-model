@@ -75,10 +75,11 @@ bool ReplayBuffer::Save(const std::string &file) const {
     return false;
   }
   const std::size_t sample_size = sizeof(Sample);
-  std::fwrite(&size_, sizeof(size_), 1, out);
-  std::fwrite(&write_pos_, sizeof(write_pos_), 1, out);
-  bool ok = std::fwrite(data_.data(), sample_size, size_, out) == size_;
-  std::fclose(out);
+  bool ok = std::fwrite(&size_, sizeof(size_), 1, out) == 1 &&
+            std::fwrite(&write_pos_, sizeof(write_pos_), 1, out) == 1 &&
+            std::fwrite(data_.data(), sample_size, size_, out) == size_ &&
+            std::fflush(out) == 0;
+  if (std::fclose(out) != 0) ok = false;
   return ok;
 }
 
@@ -89,14 +90,27 @@ bool ReplayBuffer::Load(const std::string &file) {
     return false;
   }
   const std::size_t sample_size = sizeof(Sample);
-  if (std::fread(&size_, sizeof(size_), 1, in) != 1 ||
-      std::fread(&write_pos_, sizeof(write_pos_), 1, in) != 1 ||
-      size_ > capacity_ || write_pos_ >= capacity_) {
+  std::size_t loaded_size = 0;
+  std::size_t loaded_write_pos = 0;
+  if (std::fread(&loaded_size, sizeof(loaded_size), 1, in) != 1 ||
+      std::fread(&loaded_write_pos, sizeof(loaded_write_pos), 1, in) != 1 ||
+      loaded_size > capacity_ || loaded_write_pos >= capacity_) {
     std::fclose(in);
     return false;
   }
-  bool ok = std::fread(data_.data(), sample_size, size_, in) == size_;
+  bool ok = std::fread(data_.data(), sample_size, loaded_size, in) ==
+            loaded_size;
   std::fclose(in);
+  if (!ok) {
+    // Do not leave partially read records addressable. TryResume rejects the
+    // checkpoint, but the buffer itself remains in a safe empty state without
+    // allocating a second ~859 MiB default-capacity array.
+    size_ = 0;
+    write_pos_ = 0;
+    return false;
+  }
+  size_ = loaded_size;
+  write_pos_ = loaded_write_pos;
   return ok;
 }
 

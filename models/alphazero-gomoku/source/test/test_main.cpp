@@ -3,6 +3,7 @@
 #include "game/gomoku.h"
 #include "mcts/mcts.h"
 #include "train/evaluator.h"
+#include "train/replay_buffer.h"
 
 #include <cmath>
 #include <cstdio>
@@ -247,6 +248,20 @@ public:
   }
 };
 
+class CountingEvaluator : public az::INetEvaluator {
+public:
+  int calls = 0;
+  void Predict(const az::Gomoku &game, float *policy, float &value) override {
+    ++calls;
+    int legal = 0;
+    for (int a = 0; a < az::Gomoku::kActionNum; ++a)
+      if (game.IsLegal(a)) ++legal;
+    for (int a = 0; a < az::Gomoku::kActionNum; ++a)
+      policy[a] = game.IsLegal(a) ? 1.0f / legal : 0.0f;
+    value = 0.0f;
+  }
+};
+
 namespace {
 
 void TestMctsForcedWin() {
@@ -299,6 +314,261 @@ void TestVisitDistribution() {
   CHECK(pi[A(7, 7)] == 0.0f && pi[A(8, 8)] == 0.0f); // occupied cells get none
 }
 
+void TestMctsTreeReuse() {
+  using az::Gomoku;
+  Gomoku game;
+  CHECK(PlayMoves(game, {A(7, 7), A(8, 8)}));
+  az::MctsConfig config;
+  config.simulation_num_ = 80;
+  config.dirichlet_epsilon_ = 0.0f;
+  config.reuse_tree_ = true;
+  config.max_retained_nodes_ = 1000;
+  config.max_retained_edges_ = 10000;
+  CountingEvaluator evaluator;
+  az::Mcts mcts;
+  std::mt19937 rng(11);
+  std::vector<int> actions, visits;
+  mcts.Search(game, config, evaluator, rng, actions, visits);
+  CHECK(!mcts.last_search_reused());
+
+  int best = -1, best_count = -1;
+  for (std::size_t i = 0; i < actions.size(); ++i) {
+    if (visits[i] > best_count) {
+      best = actions[i];
+      best_count = visits[i];
+    }
+  }
+  CHECK(best >= 0 && game.IsLegal(best));
+  CHECK(mcts.AdvanceRoot(best));
+  CHECK(game.Apply(best));
+  CHECK(mcts.node_count() <=
+        static_cast<std::size_t>(config.max_retained_nodes_));
+  CHECK(mcts.edge_count() <=
+        static_cast<std::size_t>(config.max_retained_edges_));
+  const int inherited_visits = mcts.root_visits();
+  CHECK(inherited_visits > 0);
+
+  evaluator.calls = 0;
+  mcts.Search(game, config, evaluator, rng, actions, visits);
+  CHECK(mcts.last_search_reused());
+  CHECK(mcts.root_visits() >= inherited_visits + config.simulation_num_);
+  const int reused_calls = evaluator.calls;
+
+  CountingEvaluator fresh_evaluator;
+  az::Mcts fresh;
+  fresh.Search(game, config, fresh_evaluator, rng, actions, visits);
+  CHECK(!fresh.last_search_reused());
+  CHECK(reused_calls < fresh_evaluator.calls);
+
+  Gomoku unrelated;
+  CHECK(PlayMoves(unrelated, {A(0, 0), A(14, 14)}));
+  mcts.Search(unrelated, config, evaluator, rng, actions, visits);
+  CHECK(!mcts.last_search_reused());
+}
+
+void TestMctsReuseDisabledByDefault() {
+  az::Gomoku game;
+  CHECK(PlayMoves(game, {A(7, 7), A(8, 8)}));
+  az::MctsConfig config;
+  config.simulation_num_ = 20;
+  config.dirichlet_epsilon_ = 0.0f;
+  CHECK(!config.reuse_tree_);
+  CountingEvaluator evaluator;
+  az::Mcts mcts;
+  std::mt19937 rng(17);
+  std::vector<int> actions, visits;
+  mcts.Search(game, config, evaluator, rng, actions, visits);
+  CHECK(mcts.root_visits() == 20);
+  mcts.Search(game, config, evaluator, rng, actions, visits);
+  CHECK(!mcts.last_search_reused());
+  CHECK(mcts.root_visits() == 20); // did not accumulate across calls
+}
+
+void TestMctsReuseSafetyAndBounds() {
+  using az::Gomoku;
+  Gomoku game;
+  CHECK(PlayMoves(game, {A(7, 7), A(8, 8)}));
+  az::MctsConfig config;
+  config.simulation_num_ = 40;
+  config.dirichlet_epsilon_ = 0.0f;
+  config.reuse_tree_ = true;
+  config.max_retained_nodes_ = 500;
+  config.max_retained_edges_ = 5000;
+  CountingEvaluator evaluator;
+  az::Mcts mcts;
+  std::mt19937 rng(29);
+  std::vector<int> actions, visits;
+
+  // Public AdvanceRoot must reject malformed external input without indexing
+  // the board out of range.
+  mcts.Search(game, config, evaluator, rng, actions, visits);
+  CHECK(!mcts.AdvanceRoot(-1));
+  CHECK(mcts.node_count() == 0);
+  mcts.Search(game, config, evaluator, rng, actions, visits);
+  CHECK(!mcts.AdvanceRoot(Gomoku::kActionNum));
+  CHECK(mcts.node_count() == 0);
+
+  // Exercise many root advances. After every real move the retained tree is
+  // either within both hard budgets or was dropped completely for rebuild.
+  for (int move = 0; move < 50 && !game.IsTerminal(); ++move) {
+    mcts.Search(game, config, evaluator, rng, actions, visits);
+    int best = -1, best_count = -1;
+    for (std::size_t i = 0; i < actions.size(); ++i) {
+      if (visits[i] > best_count) {
+        best = actions[i];
+        best_count = visits[i];
+      }
+    }
+    CHECK(best >= 0 && game.IsLegal(best));
+    const bool retained = mcts.AdvanceRoot(best);
+    CHECK(game.Apply(best));
+    if (retained) {
+      CHECK(mcts.node_count() <=
+            static_cast<std::size_t>(config.max_retained_nodes_));
+      CHECK(mcts.edge_count() <=
+            static_cast<std::size_t>(config.max_retained_edges_));
+    } else {
+      CHECK(mcts.node_count() == 0);
+      CHECK(mcts.edge_count() == 0);
+    }
+  }
+
+  az::MctsConfig tight = config;
+  tight.simulation_num_ = 80;
+  tight.max_retained_nodes_ = 10;
+  tight.max_retained_edges_ = 5000;
+  az::Mcts bounded;
+  Gomoku bounded_game;
+  CHECK(PlayMoves(bounded_game, {A(7, 7), A(8, 8)}));
+  bounded.Search(bounded_game, tight, evaluator, rng, actions, visits);
+  CHECK(bounded.budget_exhausted());
+  CHECK(bounded.node_count() <=
+        static_cast<std::size_t>(tight.max_retained_nodes_));
+  CHECK(bounded.edge_count() <=
+        static_cast<std::size_t>(tight.max_retained_edges_));
+
+  az::MctsConfig edge_tight = config;
+  edge_tight.simulation_num_ = 80;
+  std::vector<int> initial_candidates;
+  bounded_game.CandidateActions(initial_candidates);
+  edge_tight.max_retained_nodes_ = 1000;
+  edge_tight.max_retained_edges_ =
+      static_cast<int>(initial_candidates.size()) + 1;
+  az::Mcts edge_bounded;
+  edge_bounded.Search(bounded_game, edge_tight, evaluator, rng, actions,
+                      visits);
+  CHECK(edge_bounded.budget_exhausted());
+  CHECK(!actions.empty()); // root policy remains usable
+  CHECK(edge_bounded.edge_count() <=
+        static_cast<std::size_t>(edge_tight.max_retained_edges_));
+  int edge_best = actions[0];
+  CHECK(!edge_bounded.AdvanceRoot(edge_best)); // exhausted cache is dropped
+  CHECK(edge_bounded.node_count() == 0 && edge_bounded.edge_count() == 0);
+}
+
+void TestMctsNoiseResetOnReuse() {
+  az::Gomoku game;
+  CHECK(PlayMoves(game, {A(7, 7), A(8, 8)}));
+  az::MctsConfig config;
+  config.simulation_num_ = 0;
+  config.reuse_tree_ = true;
+  config.normalized_dirichlet_ = true;
+  config.dirichlet_epsilon_ = 0.25f;
+  FlatEvaluator evaluator;
+  az::Mcts mcts;
+  std::vector<int> actions;
+  std::vector<int> visits;
+  std::vector<float> first;
+  std::vector<float> second;
+  std::mt19937 rng1(31);
+  mcts.Search(game, config, evaluator, rng1, actions, visits);
+  mcts.RootPriors(actions, first);
+  std::mt19937 rng2(31);
+  mcts.Search(game, config, evaluator, rng2, actions, visits);
+  mcts.RootPriors(actions, second);
+  CHECK(mcts.last_search_reused());
+  CHECK(first.size() == second.size());
+  for (std::size_t i = 0; i < first.size(); ++i)
+    CHECK(std::fabs(first[i] - second[i]) < 1e-6f);
+}
+
+void TestDirichletNoiseWeight() {
+  az::Gomoku game;
+  CHECK(PlayMoves(game, {A(7, 7), A(8, 8)}));
+  az::MctsConfig config;
+  config.simulation_num_ = 0; // inspect root immediately after expansion
+  config.dirichlet_epsilon_ = 0.25f;
+  config.dirichlet_alpha_ = 0.3f;
+  config.normalized_dirichlet_ = true;
+  FlatEvaluator evaluator;
+  az::Mcts mcts;
+  std::mt19937 rng(23), expected_rng(23);
+  std::vector<int> actions, visits;
+  mcts.Search(game, config, evaluator, rng, actions, visits);
+  std::vector<float> prior;
+  mcts.RootPriors(actions, prior);
+  CHECK(!prior.empty());
+
+  std::gamma_distribution<float> gamma(config.dirichlet_alpha_, 1.0f);
+  std::vector<float> noise(prior.size());
+  float sum = 0.0f;
+  for (float &value : noise) {
+    value = gamma(expected_rng);
+    sum += value;
+  }
+  float prior_sum = 0.0f;
+  const float base = 1.0f / prior.size();
+  for (std::size_t i = 0; i < prior.size(); ++i) {
+    const float expected = 0.75f * base + 0.25f * noise[i] / sum;
+    CHECK(std::fabs(prior[i] - expected) < 1e-6f);
+    prior_sum += prior[i];
+  }
+  CHECK(std::fabs(prior_sum - 1.0f) < 1e-5f);
+}
+
+void TestReplaySaveReportsWriteFailure() {
+  az::ReplayBuffer buffer(2);
+  az::Sample sample{};
+  buffer.Push(sample);
+  // Linux's /dev/full accepts open() but reports ENOSPC while flushing. Save
+  // must not claim success and replace a valid replay checkpoint afterward.
+  CHECK(!buffer.Save("/dev/full"));
+}
+
+void TestReplayLoadFailurePreservesBuffer() {
+  az::ReplayBuffer buffer(2);
+  az::Sample sample{};
+  sample.value = 0.5f;
+  buffer.Push(sample);
+  const char *path = "/tmp/az_bad_replay.bin";
+  FILE *out = std::fopen(path, "wb");
+  std::size_t bad_size = 99;
+  std::size_t bad_position = 0;
+  CHECK(out != nullptr);
+  if (out != nullptr) {
+    std::fwrite(&bad_size, sizeof(bad_size), 1, out);
+    std::fwrite(&bad_position, sizeof(bad_position), 1, out);
+    std::fclose(out);
+  }
+  CHECK(!buffer.Load(path));
+  CHECK(buffer.Size() == 1); // rejected header never touched live records
+  CHECK(std::fabs(buffer.At(0).value - 0.5f) < 1e-6f);
+  std::remove(path);
+
+  out = std::fopen(path, "wb");
+  std::size_t one = 1;
+  std::size_t position = 1;
+  CHECK(out != nullptr);
+  if (out != nullptr) {
+    std::fwrite(&one, sizeof(one), 1, out);
+    std::fwrite(&position, sizeof(position), 1, out);
+    std::fclose(out); // payload deliberately absent
+  }
+  CHECK(!buffer.Load(path));
+  CHECK(buffer.Size() == 0); // partial payload is never addressable
+  std::remove(path);
+}
+
 } // namespace
 
 int main() {
@@ -311,6 +581,13 @@ int main() {
   TestSymmetryConsistency();
   TestMctsForcedWin();
   TestVisitDistribution();
+  TestMctsTreeReuse();
+  TestMctsReuseDisabledByDefault();
+  TestMctsReuseSafetyAndBounds();
+  TestMctsNoiseResetOnReuse();
+  TestDirichletNoiseWeight();
+  TestReplaySaveReportsWriteFailure();
+  TestReplayLoadFailurePreservesBuffer();
 
   std::printf("%d checks, %d failed\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;

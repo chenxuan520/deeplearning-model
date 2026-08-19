@@ -103,6 +103,7 @@ int PlaySelfPlayGame(Evaluator &evaluator, EvalCache *cache,
       action = legal[dist2(rng)];
     }
     game.Apply(action);
+    if (config.mcts_.reuse_tree_) mcts.AdvanceRoot(action);
   }
 
   const int result = game.IsTerminal() ? game.Result() : 2; // cap -> draw
@@ -185,8 +186,11 @@ SelfPlayStats RunSelfPlay(deeplearning::PolicyValueResNet &master,
 int PlayMatch(INetEvaluator &black_evaluator, INetEvaluator &white_evaluator,
               const MctsConfig &mcts_config, int temperature_move_cutoff,
               int max_moves, std::mt19937 &rng) {
-  MctsConfig quiet = mcts_config;
-  quiet.dirichlet_epsilon_ = 0.0f; // no exploration noise in matches
+  MctsConfig match_config = mcts_config;
+  // Preserve historical match/gate behavior unless a caller explicitly opts
+  // into the standards-compliant noisy evaluation mode.
+  if (!match_config.normalized_dirichlet_)
+    match_config.dirichlet_epsilon_ = 0.0f;
   Mcts mcts_black, mcts_white;
   Gomoku game;
   std::vector<int> visit_action, visit_count;
@@ -198,7 +202,7 @@ int PlayMatch(INetEvaluator &black_evaluator, INetEvaluator &white_evaluator,
                                                 : white_evaluator;
     Mcts &mcts =
         game.current_player() == Gomoku::kBlack ? mcts_black : mcts_white;
-    mcts.Search(game, quiet, evaluator, rng, visit_action, visit_count);
+    mcts.Search(game, match_config, evaluator, rng, visit_action, visit_count);
     Mcts::VisitDistribution(visit_action, visit_count, pi.data());
     int action;
     if (game.move_count() < temperature_move_cutoff) {
@@ -218,6 +222,10 @@ int PlayMatch(INetEvaluator &black_evaluator, INetEvaluator &white_evaluator,
         }
     }
     game.Apply(action);
+    if (match_config.reuse_tree_) {
+      mcts_black.AdvanceRoot(action);
+      mcts_white.AdvanceRoot(action);
+    }
   }
   return game.IsTerminal() ? game.Result() : 2;
 }
@@ -248,10 +256,17 @@ DuelStats RunDuel(deeplearning::PolicyValueResNet &a,
     eval_b.Init(config);
     AssignWeights(eval_a.net(), a);
     AssignWeights(eval_b.net(), b);
-    std::mt19937 rng(static_cast<unsigned>(seed * 1000003u + worker_index));
+    std::mt19937 worker_rng(
+        static_cast<unsigned>(seed * 1000003u + worker_index));
     while (true) {
       const int game_index = next_game.fetch_add(1);
       if (game_index >= game_num) break;
+      std::mt19937 game_rng;
+      std::mt19937 *rng = &worker_rng;
+      if (mcts_config.deterministic_game_seeds_) {
+        game_rng.seed(static_cast<unsigned>(seed * 1000003u + game_index));
+        rng = &game_rng;
+      }
       // alternate colors: even games A is black
       INetEvaluator *black = &eval_a, *white = &eval_b;
       bool a_is_black = true;
@@ -260,11 +275,15 @@ DuelStats RunDuel(deeplearning::PolicyValueResNet &a,
         a_is_black = false;
       }
       const int result = PlayMatch(*black, *white, mcts_config,
-                                   temperature_move_cutoff, max_moves, rng);
+                                   temperature_move_cutoff, max_moves,
+                                   *rng);
       std::lock_guard<std::mutex> lock(mutex);
       if (result == 2) ++stats.draws;
-      else if ((result == Gomoku::kBlack) == a_is_black) ++stats.a_wins;
-      else ++stats.b_wins;
+      else if ((result == Gomoku::kBlack) == a_is_black) {
+        ++stats.a_wins;
+        if (a_is_black) ++stats.a_black_wins;
+        else ++stats.a_white_wins;
+      } else ++stats.b_wins;
     }
   };
 
@@ -320,6 +339,7 @@ DuelStats RunVsRandom(deeplearning::PolicyValueResNet &net,
           action = legal[dist(rng)];
         }
         game.Apply(action);
+        if (mcts_config.reuse_tree_) mcts.AdvanceRoot(action);
       }
       const int result = game.IsTerminal() ? game.Result() : 2;
       std::lock_guard<std::mutex> lock(mutex);

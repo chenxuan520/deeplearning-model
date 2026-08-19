@@ -47,6 +47,7 @@ int PlayOneGame(Evaluator &evaluator, JsOpponent &opponent,
       }
     }
     game.Apply(action);
+    if (mcts_config.reuse_tree_) mcts.AdvanceRoot(action);
   }
   if (!game.IsTerminal()) {
     return 0;

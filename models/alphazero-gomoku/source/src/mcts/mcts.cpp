@@ -32,6 +32,14 @@ void Mcts::AttachEdges(int node_index, const Gomoku &game,
   // edges unvisited and turn pi targets into noise. Priors renormalize over
   // the candidate subset.
   game.CandidateActions(candidate_scratch_);
+  if (reuse_tree_active_ && max_retained_edges_ > 0 &&
+      edges_.size() + candidate_scratch_.size() >
+          static_cast<std::size_t>(max_retained_edges_)) {
+    budget_exhausted_ = true;
+    node.edge_begin_ = -1;
+    node.edge_num_ = 0;
+    return;
+  }
   float prior_sum = 0.0f;
   for (int action : candidate_scratch_) {
     prior_sum += policy[action];
@@ -43,6 +51,7 @@ void Mcts::AttachEdges(int node_index, const Gomoku &game,
     Edge edge;
     edge.action_ = action;
     edge.prior_ = policy[action] / prior_sum;
+    edge.base_prior_ = edge.prior_;
     edges_.push_back(edge);
   }
   node.edge_num_ = static_cast<int>(edges_.size()) - node.edge_begin_;
@@ -57,26 +66,145 @@ float Mcts::ExpandNode(int node_index, Gomoku &game,
   return value;
 }
 
-void Mcts::ExpandRoot(Gomoku &game, const MctsConfig &config,
-                      INetEvaluator &evaluator, std::mt19937 &rng) {
-  ExpandNode(0, game, evaluator);
-  if (config.dirichlet_epsilon_ <= 0.0f) {
-    return;
-  }
-  Node &root = nodes_[0];
-  std::gamma_distribution<float> gamma(config.dirichlet_alpha_, 1.0f);
-  float total = 0.0f;
+void Mcts::ApplyRootNoise(int node_index, const MctsConfig &config,
+                          std::mt19937 &rng) {
+  Node &root = nodes_[node_index];
   for (int i = 0; i < root.edge_num_; ++i) {
     Edge &edge = edges_[root.edge_begin_ + i];
-    edge.prior_ = (1.0f - config.dirichlet_epsilon_) * edge.prior_ +
-                  config.dirichlet_epsilon_ * gamma(rng);
-    total += edge.prior_;
+    edge.prior_ = edge.base_prior_;
   }
-  if (total > 0.0f) {
-    const float inverse = 1.0f / total;
+  if (config.dirichlet_epsilon_ <= 0.0f) return;
+
+  std::gamma_distribution<float> gamma(config.dirichlet_alpha_, 1.0f);
+  if (!config.normalized_dirichlet_) {
+    // Legacy behavior used by the long-running trainer.  Preserve it unless
+    // an evaluation explicitly opts into the standard normalized variant.
+    float total = 0.0f;
     for (int i = 0; i < root.edge_num_; ++i) {
-      edges_[root.edge_begin_ + i].prior_ *= inverse;
+      Edge &edge = edges_[root.edge_begin_ + i];
+      edge.prior_ = (1.0f - config.dirichlet_epsilon_) * edge.base_prior_ +
+                    config.dirichlet_epsilon_ * gamma(rng);
+      total += edge.prior_;
     }
+    if (total > 0.0f) {
+      const float inverse = 1.0f / total;
+      for (int i = 0; i < root.edge_num_; ++i)
+        edges_[root.edge_begin_ + i].prior_ *= inverse;
+    }
+    return;
+  }
+
+  std::vector<float> noise(root.edge_num_, 0.0f);
+  float noise_total = 0.0f;
+  for (int i = 0; i < root.edge_num_; ++i) {
+    noise[i] = gamma(rng);
+    noise_total += noise[i];
+  }
+  if (noise_total > 0.0f) {
+    const float inverse = 1.0f / noise_total;
+    for (int i = 0; i < root.edge_num_; ++i) {
+      Edge &edge = edges_[root.edge_begin_ + i];
+      edge.prior_ =
+          (1.0f - config.dirichlet_epsilon_) * edge.base_prior_ +
+          config.dirichlet_epsilon_ * noise[i] * inverse;
+    }
+  }
+}
+
+void Mcts::ExpandRoot(int node_index, Gomoku &game, const MctsConfig &config,
+                       INetEvaluator &evaluator, std::mt19937 &rng) {
+  ExpandNode(node_index, game, evaluator);
+  ApplyRootNoise(node_index, config, rng);
+}
+
+bool Mcts::SamePosition(const Gomoku &left, const Gomoku &right) {
+  return left.current_player() == right.current_player() &&
+         left.move_count() == right.move_count() &&
+         left.last_action() == right.last_action() &&
+         left.Result() == right.Result() && left.board() == right.board();
+}
+
+void Mcts::Reset() {
+  nodes_.clear();
+  edges_.clear();
+  path_nodes_.clear();
+  path_edges_.clear();
+  root_ = -1;
+  last_search_reused_ = false;
+  reuse_tree_active_ = false;
+  budget_exhausted_ = false;
+}
+
+void Mcts::ReleaseTreeStorage() {
+  std::vector<Node>().swap(nodes_);
+  std::vector<Edge>().swap(edges_);
+  std::vector<int>().swap(path_nodes_);
+  std::vector<int>().swap(path_edges_);
+  root_ = -1;
+  last_search_reused_ = false;
+  reuse_tree_active_ = false;
+  budget_exhausted_ = false;
+}
+
+bool Mcts::OverRetentionBudget() const {
+  return (max_retained_nodes_ > 0 &&
+          nodes_.size() >= static_cast<std::size_t>(max_retained_nodes_)) ||
+         (max_retained_edges_ > 0 &&
+          edges_.size() >= static_cast<std::size_t>(max_retained_edges_));
+}
+
+bool Mcts::AdvanceRoot(int action) {
+  if (action < 0 || action >= Gomoku::kActionNum || root_ < 0 ||
+      !root_game_.IsLegal(action)) {
+    Reset();
+    return false;
+  }
+  int child = -1;
+  const Node &root = nodes_[root_];
+  if (root.edge_begin_ >= 0) {
+    for (int i = 0; i < root.edge_num_; ++i) {
+      Edge &edge = edges_[root.edge_begin_ + i];
+      if (edge.action_ == action) {
+        if (edge.child_ < 0) {
+          if (max_retained_nodes_ > 0 &&
+              nodes_.size() >=
+                  static_cast<std::size_t>(max_retained_nodes_)) {
+            ReleaseTreeStorage();
+            return false;
+          }
+          edge.child_ = AllocateNode();
+        }
+        child = edge.child_;
+        break;
+      }
+    }
+  }
+  if (child < 0 || !root_game_.Apply(action)) {
+    Reset();
+    return false;
+  }
+  root_ = child;
+  // Treat reuse as a bounded cache. Dropping an oversized tree is cheaper and
+  // safer than holding old+compacted copies simultaneously; the next Search
+  // rebuilds the current position from the network.
+  if (budget_exhausted_ || OverRetentionBudget()) ReleaseTreeStorage();
+  return root_ >= 0;
+}
+
+int Mcts::root_visits() const {
+  return root_ >= 0 ? nodes_[root_].n_ : 0;
+}
+
+void Mcts::RootPriors(std::vector<int> &actions,
+                      std::vector<float> &priors) const {
+  actions.clear();
+  priors.clear();
+  if (root_ < 0 || nodes_[root_].edge_begin_ < 0) return;
+  const Node &root = nodes_[root_];
+  for (int i = 0; i < root.edge_num_; ++i) {
+    const Edge &edge = edges_[root.edge_begin_ + i];
+    actions.push_back(edge.action_);
+    priors.push_back(edge.prior_);
   }
 }
 
@@ -106,19 +234,59 @@ void Mcts::Search(const Gomoku &game, const MctsConfig &config,
                   INetEvaluator &evaluator, std::mt19937 &rng,
                   std::vector<int> &visit_action,
                   std::vector<int> &visit_count) {
-  nodes_.clear();
-  edges_.clear();
-  path_nodes_.clear();
-  path_edges_.clear();
-
-  const int root = AllocateNode();
+  const bool can_reuse = config.reuse_tree_ && root_ >= 0 &&
+                         SamePosition(root_game_, game);
+  last_search_reused_ = can_reuse;
+  if (!can_reuse) {
+    Reset();
+    root_ = AllocateNode();
+    root_game_ = game;
+  }
   fpu_reduction_ = config.fpu_reduction_;
+  max_retained_nodes_ = config.max_retained_nodes_;
+  max_retained_edges_ = config.max_retained_edges_;
+  reuse_tree_active_ = config.reuse_tree_;
+  budget_exhausted_ = false;
+  if (config.reuse_tree_) {
+    if (max_retained_nodes_ > 0 &&
+        nodes_.capacity() < static_cast<std::size_t>(max_retained_nodes_))
+      nodes_.reserve(max_retained_nodes_);
+    if (max_retained_edges_ > 0 &&
+        edges_.capacity() < static_cast<std::size_t>(max_retained_edges_))
+      edges_.reserve(max_retained_edges_);
+  }
+  if (can_reuse && OverRetentionBudget()) {
+    ReleaseTreeStorage();
+    root_ = AllocateNode();
+    root_game_ = game;
+    last_search_reused_ = false;
+    reuse_tree_active_ = config.reuse_tree_;
+    budget_exhausted_ = false;
+  }
   Gomoku work = game;
-  ExpandRoot(work, config, evaluator, rng);
+  if (nodes_[root_].edge_begin_ < 0) {
+    ExpandRoot(root_, work, config, evaluator, rng);
+    // Old unreachable branches may consume the edge budget before a newly
+    // selected, unexpanded root can attach its legal moves. Discard the cache
+    // and rebuild this exact position instead of returning an empty policy.
+    if (budget_exhausted_) {
+      ReleaseTreeStorage();
+      root_ = AllocateNode();
+      root_game_ = game;
+      last_search_reused_ = false;
+      reuse_tree_active_ = config.reuse_tree_;
+      budget_exhausted_ = false;
+      work = game;
+      ExpandRoot(root_, work, config, evaluator, rng);
+    }
+  } else {
+    ApplyRootNoise(root_, config, rng);
+  }
 
-  for (int sim = 0; sim < config.simulation_num_; ++sim) {
+  for (int sim = 0;
+       sim < config.simulation_num_ && !budget_exhausted_; ++sim) {
     work = game;
-    int node = root;
+    int node = root_;
     path_nodes_.clear();
     path_edges_.clear();
 
@@ -139,6 +307,13 @@ void Mcts::Search(const Gomoku &game, const MctsConfig &config,
       work.Apply(edges_[edge].action_);
       int &child = edges_[edge].child_;
       if (child < 0) {
+        if (config.reuse_tree_ && max_retained_nodes_ > 0 &&
+            nodes_.size() >=
+                static_cast<std::size_t>(max_retained_nodes_)) {
+          budget_exhausted_ = true;
+          value = 0.0f;
+          break;
+        }
         child = AllocateNode();
       }
       node = child;
@@ -160,7 +335,7 @@ void Mcts::Search(const Gomoku &game, const MctsConfig &config,
   // Export root visit distribution.
   visit_action.clear();
   visit_count.clear();
-  const Node &root_node = nodes_[root];
+  const Node &root_node = nodes_[root_];
   if (root_node.edge_begin_ >= 0) {
     for (int i = 0; i < root_node.edge_num_; ++i) {
       const Edge &edge = edges_[root_node.edge_begin_ + i];

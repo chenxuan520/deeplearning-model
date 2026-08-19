@@ -45,9 +45,9 @@ SelfPlayStats RunSelfPlay(deeplearning::PolicyValueResNet &master,
                           ReplayBuffer &buffer);
 
 // Plays one full game between two evaluators starting from a fresh board.
-// `black_first_evaluator` plays black. No exploration noise, argmax action
-// after the temperature cutoff (same MCTS config, but dirichlet epsilon is
-// forced to 0). Returns +1 black wins, -1 white wins, 0 draw (incl. cap).
+// `black_first_evaluator` plays black. Legacy/default matches force exploration
+// noise off; callers may explicitly opt into normalized root noise. Returns
+// +1 black wins, -1 white wins, 0 draw (including the move cap).
 int PlayMatch(INetEvaluator &black_evaluator, INetEvaluator &white_evaluator,
               const MctsConfig &mcts_config, int temperature_move_cutoff,
               int max_moves, std::mt19937 &rng);
@@ -62,6 +62,8 @@ struct DuelStats {
   int a_wins = 0;
   int b_wins = 0;
   int draws = 0;
+  int a_black_wins = 0;
+  int a_white_wins = 0;
 };
 
 // Parallel arena: net A vs net B, colors alternating, no exploration noise,

@@ -48,14 +48,15 @@ void PrintUsage() {
   std::printf(
       "usage: alphazero <command> [options]\n"
       "  train  (AlphaZero loop: self-play + train + gate; see options below)\n"
-      "  eval   --model FILE [--games 20] [--sims 100] [--workers 8]\n"
+      "  eval   --model FILE [--games 20] [--sims 100] [--workers 8] [--reuse-tree 0]\n"
       "  arena  --model-a FILE --model-b FILE [--games 20] [--sims 100]\n"
-      "         [--workers 8] [--temp-moves 0]\n"
-      "  play   [--model FILE] [--sims 100]  (you play white, stdin \"row col\"\n"
+      "         [--workers 8] [--temp-moves 0] [--dir-eps 0] [--dir-alpha .3]\n"
+      "         [--deterministic-games 0] [--reuse-tree 0]\n"
+      "  play   [--model FILE] [--sims 100] [--reuse-tree 0] (you play white)\n"
       "  serve  [--model FILE] [--port 8765] [--sims 800] [--threads 24]\n"
       "           (HTTP move API for the web frontend; CORS open)\n"
       "  gauntlet [--model FILE] [--games 10] [--workers 8] [--levels 6,7]\n"
-      "           [--color both|black|white] [--dir-eps 0] [--dir-alpha .3]\n"
+      "           [--color both|black|white] [--dir-eps 0] [--dir-alpha .3] [--reuse-tree 0]\n"
       "           (acceptance vs game-old JS levels 1-7)\n"
       "  bench  [--trunk N] [--blocks N] [--batch B] [--threads T] [--iters N]\n"
       "  bench  --concurrent N [--iters N]\n"
@@ -67,6 +68,7 @@ void PrintUsage() {
       "  --lr X (1e-3)  --wd X (1e-4)  --buffer N (200000)\n"
       "  --max-moves N (200)  --temp-moves N (12)\n"
       "  --cpuct X (1.5)  --dir-eps X (0.25)  --dir-alpha X (0.3)\n"
+      "  --reuse-tree 0|1 (0)\n"
       "  --trunk N (32)  --blocks N (4)\n"
       "  --gate-every N (5)  --gate-games N (20)  --gate-threshold X (0.55)\n"
       "  --no-resume  --no-cache  --save-buffer-every N (10)\n");
@@ -184,6 +186,7 @@ const char *ResultText(const az::DuelStats &s) {
 int CmdEval(int argc, char **argv) {
   std::string model = "runtime/best.net";
   int games = 20, sims = 100, workers = 8, max_moves = 200, seed = 7;
+  bool reuse_tree = false;
   for (int i = 2; i + 1 < argc; i += 2) {
     if (!std::strcmp(argv[i], "--model")) model = argv[i + 1];
     if (!std::strcmp(argv[i], "--games")) games = std::atoi(argv[i + 1]);
@@ -192,12 +195,15 @@ int CmdEval(int argc, char **argv) {
     if (!std::strcmp(argv[i], "--max-moves"))
       max_moves = std::atoi(argv[i + 1]);
     if (!std::strcmp(argv[i], "--seed")) seed = std::atoi(argv[i + 1]);
+    if (!std::strcmp(argv[i], "--reuse-tree"))
+      reuse_tree = std::atoi(argv[i + 1]) != 0;
   }
   PolicyValueResNet net;
   if (!LoadNet(model, net)) return 1;
   az::MctsConfig mcts;
   mcts.simulation_num_ = sims;
   mcts.dirichlet_epsilon_ = 0.0f;
+  mcts.reuse_tree_ = reuse_tree;
   auto stats = az::RunVsRandom(net, mcts, games, workers, max_moves, seed);
   std::printf("vs random (model alternates colors): %s  win-rate=%.1f%%\n",
               ResultText(stats),
@@ -209,6 +215,8 @@ int CmdArena(int argc, char **argv) {
   std::string model_a = "runtime/latest.net", model_b = "runtime/best.net";
   int games = 20, sims = 100, workers = 8, max_moves = 200, seed = 7;
   int temp_moves = 0;
+  float dir_eps = 0.0f, dir_alpha = 0.3f;
+  bool deterministic_games = false, reuse_tree = false;
   for (int i = 2; i + 1 < argc; i += 2) {
     if (!std::strcmp(argv[i], "--model-a")) model_a = argv[i + 1];
     if (!std::strcmp(argv[i], "--model-b")) model_b = argv[i + 1];
@@ -220,20 +228,34 @@ int CmdArena(int argc, char **argv) {
     if (!std::strcmp(argv[i], "--seed")) seed = std::atoi(argv[i + 1]);
     if (!std::strcmp(argv[i], "--temp-moves"))
       temp_moves = std::atoi(argv[i + 1]);
+    if (!std::strcmp(argv[i], "--dir-eps"))
+      dir_eps = static_cast<float>(std::atof(argv[i + 1]));
+    if (!std::strcmp(argv[i], "--dir-alpha"))
+      dir_alpha = static_cast<float>(std::atof(argv[i + 1]));
+    if (!std::strcmp(argv[i], "--deterministic-games"))
+      deterministic_games = std::atoi(argv[i + 1]) != 0;
+    if (!std::strcmp(argv[i], "--reuse-tree"))
+      reuse_tree = std::atoi(argv[i + 1]) != 0;
   }
   PolicyValueResNet a, b;
   if (!LoadNet(model_a, a) || !LoadNet(model_b, b)) return 1;
   az::MctsConfig mcts;
   mcts.simulation_num_ = sims;
-  mcts.dirichlet_epsilon_ = 0.0f;
+  mcts.dirichlet_epsilon_ = dir_eps;
+  mcts.dirichlet_alpha_ = dir_alpha;
+  mcts.normalized_dirichlet_ = dir_eps > 0.0f;
+  mcts.deterministic_game_seeds_ = deterministic_games;
+  mcts.reuse_tree_ = reuse_tree;
   auto stats =
       az::RunDuel(a, b, mcts, games, workers, temp_moves, max_moves, seed);
   const int decisive = stats.a_wins + stats.b_wins;
   std::printf("arena %s vs %s: A %s  (rate=%.2f over %d decisive)\n",
               model_a.c_str(), model_b.c_str(), ResultText(stats),
               decisive > 0 ? static_cast<double>(stats.a_wins) / decisive
-                           : 0.5,
+                            : 0.5,
               decisive);
+  std::printf("A color split: black_wins=%d white_wins=%d\n",
+              stats.a_black_wins, stats.a_white_wins);
   return 0;
 }
 
@@ -244,6 +266,7 @@ int CmdGauntlet(int argc, char **argv) {
   std::vector<int> levels = {1, 2, 3, 4, 5, 6, 7};
   int games = 10, workers = 8, sims = 100, max_moves = 225, seed = 99;
   float dir_eps = 0.0f, dir_alpha = 0.3f;
+  bool reuse_tree = false;
   az::GauntletColor color = az::GauntletColor::BOTH;
   const char *color_name = "both";
   for (int i = 2; i + 1 < argc; i += 2) {
@@ -258,6 +281,8 @@ int CmdGauntlet(int argc, char **argv) {
       dir_eps = static_cast<float>(std::atof(argv[i + 1]));
     if (!std::strcmp(argv[i], "--dir-alpha"))
       dir_alpha = static_cast<float>(std::atof(argv[i + 1]));
+    if (!std::strcmp(argv[i], "--reuse-tree"))
+      reuse_tree = std::atoi(argv[i + 1]) != 0;
     if (!std::strcmp(argv[i], "--color")) {
       color_name = argv[i + 1];
       if (!std::strcmp(color_name, "black"))
@@ -294,6 +319,8 @@ int CmdGauntlet(int argc, char **argv) {
   mcts.simulation_num_ = sims;
   mcts.dirichlet_epsilon_ = dir_eps;
   mcts.dirichlet_alpha_ = dir_alpha;
+  mcts.normalized_dirichlet_ = dir_eps > 0.0f;
+  mcts.reuse_tree_ = reuse_tree;
   std::printf("gauntlet: %s vs %zu levels x %d games, color=%s\n",
               model.c_str(), levels.size(), games, color_name);
   auto results = az::RunGauntlet(net, levels, games, workers, mcts, max_moves,
@@ -339,9 +366,12 @@ void PrintBoard(const Gomoku &game) {
 int CmdPlay(int argc, char **argv) {
   std::string model = "runtime/best.net";
   int sims = 100;
+  bool reuse_tree = false;
   for (int i = 2; i + 1 < argc; i += 2) {
     if (!std::strcmp(argv[i], "--model")) model = argv[i + 1];
     if (!std::strcmp(argv[i], "--sims")) sims = std::atoi(argv[i + 1]);
+    if (!std::strcmp(argv[i], "--reuse-tree"))
+      reuse_tree = std::atoi(argv[i + 1]) != 0;
   }
   PolicyValueResNet net;
   if (!LoadNet(model, net)) return 1;
@@ -354,6 +384,7 @@ int CmdPlay(int argc, char **argv) {
   az::MctsConfig mcts;
   mcts.simulation_num_ = sims;
   mcts.dirichlet_epsilon_ = 0.0f;
+  mcts.reuse_tree_ = reuse_tree;
   az::Mcts search;
   std::mt19937 rng(1234);
 
@@ -386,6 +417,7 @@ int CmdPlay(int argc, char **argv) {
       }
     }
     game.Apply(action);
+    if (mcts.reuse_tree_) search.AdvanceRoot(action);
     PrintBoard(game);
   }
   const int result = game.Result();
@@ -444,6 +476,7 @@ int CmdTrain(int argc, char **argv) {
     else if (!std::strcmp(key, "--dir-eps")) config.selfplay_.mcts_.dirichlet_epsilon_ = std::atof(value);
     else if (!std::strcmp(key, "--dir-alpha")) config.selfplay_.mcts_.dirichlet_alpha_ = std::atof(value);
     else if (!std::strcmp(key, "--fpu")) config.selfplay_.mcts_.fpu_reduction_ = std::atof(value);
+    else if (!std::strcmp(key, "--reuse-tree")) config.selfplay_.mcts_.reuse_tree_ = std::atoi(value) != 0;
     else if (!std::strcmp(key, "--gate-every")) config.gate_every_ = std::atoi(value);
     else if (!std::strcmp(key, "--gate-games")) config.gate_games_ = std::atoi(value);
     else if (!std::strcmp(key, "--gate-threshold")) config.gate_threshold_ = std::atof(value);

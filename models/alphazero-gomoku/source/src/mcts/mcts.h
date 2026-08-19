@@ -13,7 +13,17 @@ struct MctsConfig {
   float c_puct_ = 1.5f;           // exploration constant
   float dirichlet_alpha_ = 0.3f;  // root noise shape
   float dirichlet_epsilon_ = 0.25f; // root noise weight (0 disables)
+  // Keep the mature training run bit-for-bit compatible by default.  The
+  // standards-compliant normalized Dirichlet mix is enabled explicitly in
+  // evaluation experiments; changing it in self-play would change training.
+  bool normalized_dirichlet_ = false;
+  // Evaluation-only reproducibility switch. Mature training gates keep the
+  // historical worker-local RNG stream when false.
+  bool deterministic_game_seeds_ = false;
   float fpu_reduction_ = 0.0f;    // first-play-urgency reduction vs parent q
+  bool reuse_tree_ = false;       // keep the selected subtree across moves
+  int max_retained_nodes_ = 12000; // compact unreachable branches above this
+  int max_retained_edges_ = 250000;
 };
 
 // Single-game MCTS over Gomoku with an injected evaluator. Reused across
@@ -29,6 +39,7 @@ public:
     int action_ = -1;
     int child_ = -1;
     float prior_ = 0.0f;
+    float base_prior_ = 0.0f; // network prior before per-root noise
     int n_ = 0;
     float w_ = 0.0f;
   };
@@ -51,6 +62,19 @@ public:
               INetEvaluator &evaluator, std::mt19937 &rng,
               std::vector<int> &visit_action, std::vector<int> &visit_count);
 
+  // Moves the persistent root to `action`. Returns true when the matching
+  // subtree existed (an unexpanded child is materialized); false resets the
+  // tree. Call after every real move when reuse_tree_ is enabled.
+  bool AdvanceRoot(int action);
+  void Reset();
+
+  bool last_search_reused() const { return last_search_reused_; }
+  int root_visits() const;
+  std::size_t node_count() const { return nodes_.size(); }
+  std::size_t edge_count() const { return edges_.size(); }
+  bool budget_exhausted() const { return budget_exhausted_; }
+  void RootPriors(std::vector<int> &actions, std::vector<float> &priors) const;
+
   // Visit-count distribution normalized to a probability vector over all
   // kActionNum actions (zeros elsewhere).
   static void VisitDistribution(const std::vector<int> &visit_action,
@@ -64,13 +88,25 @@ private:
   // Expands a fresh leaf node with the net. Returns value for the player to
   // move at this node.
   float ExpandNode(int node_index, Gomoku &game, INetEvaluator &evaluator);
-  void ExpandRoot(Gomoku &game, const MctsConfig &config,
-                  INetEvaluator &evaluator, std::mt19937 &rng);
+  void ExpandRoot(int node_index, Gomoku &game, const MctsConfig &config,
+                   INetEvaluator &evaluator, std::mt19937 &rng);
+  void ApplyRootNoise(int node_index, const MctsConfig &config,
+                      std::mt19937 &rng);
+  bool OverRetentionBudget() const;
+  void ReleaseTreeStorage();
+  static bool SamePosition(const Gomoku &left, const Gomoku &right);
   static float TerminalValue(const Gomoku &game);
   int SelectEdge(int node_index, float c_puct) const;
 
   std::vector<Node> nodes_;
   std::vector<Edge> edges_;
+  int root_ = -1;
+  Gomoku root_game_;
+  bool last_search_reused_ = false;
+  int max_retained_nodes_ = 12000;
+  int max_retained_edges_ = 250000;
+  bool reuse_tree_active_ = false;
+  bool budget_exhausted_ = false;
   float fpu_reduction_ = 0.25f; // set at Search() entry from config
   // scratch
   std::vector<int> path_nodes_;

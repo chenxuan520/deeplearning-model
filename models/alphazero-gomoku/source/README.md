@@ -55,7 +55,7 @@
 
 ```bash
 mkdir -p build && cd build && cmake .. -DCMAKE_BUILD_TYPE=Release && make -j
-cd .. && ./bin/test_az        # 4100 checks, 0 failed
+cd .. && ./bin/test_az        # 4411 checks, 0 failed
 ```
 
 ## 命令
@@ -74,6 +74,10 @@ cd .. && ./bin/test_az        # 4100 checks, 0 failed
 # 两个模型打擂台
 ./bin/alphazero arena --model-a runtime/latest.net --model-b runtime/best.net \
     --games 50 --sims 48 --temp-moves 6
+
+# 显式开启有界 MCTS 子树复用(默认关闭,便于严格 A/B)
+./bin/alphazero arena --model-a runtime/latest.net --model-b runtime/best.net \
+    --games 50 --sims 48 --temp-moves 6 --reuse-tree 1
 
 # 相同逐局根噪声的模型 vs JS 档位横评
 ./bin/alphazero gauntlet --model runtime/best.net --levels 1,2,3,4,5,6 \
@@ -122,7 +126,7 @@ src/game/       Gomoku 规则/编码/8对称
 src/mcts/       MCTS (PUCT + Dirichlet 根噪声)
 src/train/      评估器(INetEvaluator/缓存) / 回放池 / 自对弈 / 擂台 / 训练器
 test/           单元测试(规则/编码/对称/MCTS 必杀局面)
-runtime/        训练产物：latest.net best.net latest.opt latest.state buffer.bin train.log
+runtime/        训练产物：版本化 latest/best/buffer bundle + latest.current 原子指针 + train.log
 runtime.out     nohup stdout
 ```
 
@@ -132,3 +136,7 @@ runtime.out     nohup stdout
 - **终局价值约定**：赢的局面返回 -1（按"该走棋的一方视角"的约定，终局时没有下一手，行棋方即输家视角），保证 MCTS 回溯逐层翻转的符号一致。
 - **worker 网络副本**：组件内部线程池不可多实例并发复用，所以每个自对弈 worker 持有独立网络副本（拷贝含 BN running statistics，不只可训练参数）。
 - **无 resign**：v1 未做认输加速，弱网阶段价值信号不可靠，先靠 max-moves 截断。
+- **子树复用默认关闭**：显式 `--reuse-tree 1` 才在真实落子后继承 child subtree；
+  node/edge 有硬预算，超限释放整树重建，避免长局内存无界增长。
+- **checkpoint 三元组**：`latest.current` 一次提交 latest/best/buffer generation；文件和
+  目录均 fsync。平台判定用 nonce 请求训练器在完整 iteration 边界暂停，永不外部 kill。

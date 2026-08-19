@@ -44,7 +44,16 @@ private:
   bool TrainStep(int batch_size, float learning_rate, float &policy_loss,
                  float &value_loss);
   void RefreshHardSet(); // re-scan buffer once per iteration (hard negatives)
-  void Checkpoint(const std::string &tag);
+  bool Checkpoint(const std::string &tag);
+  bool PrepareBestCheckpoint();
+  bool PublishLatestCheckpoint();
+  void DiscardPendingLatest();
+  void DiscardPendingBest();
+  bool PrepareReplayBuffer();
+  void DiscardPendingReplayBuffer();
+  // Called only at a durable iteration boundary. Returns true when a verified
+  // plateau result requests a clean trainer exit.
+  bool WaitForPlateauDecision(bool replay_already_saved);
   bool TryResume();
   void WriteLog(const char *fmt, ...);
 
@@ -59,6 +68,12 @@ private:
   std::string log_path_;
   std::vector<int> hard_indices_; // buffer indices of "must defend" states
   float hard_fraction_ = 0.3f;    // of each batch
+  int pending_latest_generation_ = -1;
+  int previous_latest_generation_ = -1;
+  int current_best_generation_ = -1;
+  int pending_best_generation_ = -1;
+  int current_buffer_generation_ = -1;
+  int pending_buffer_generation_ = -1;
 };
 
 } // namespace az
