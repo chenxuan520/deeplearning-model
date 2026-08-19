@@ -3,7 +3,7 @@
   "version": 1,
   "file": "https://azgomoku.011203.xyz/iter330-c4f41fcb.net",
   "engine": "https://azgomoku.011203.xyz/alphazero-gomoku-b5cd1abe.js",
-  "training_curve": "https://azgomoku.011203.xyz/policy_loss_analysis-iter330-25dc9de5.png",
+  "training_curve": "https://azgomoku.011203.xyz/policy_loss_analysis-iter382-223bcecf.png",
   "sha256": "c4f41fcba6acd9f0956a5f64c0a80762fc21b9871b5ef429d3335ecfa47275dc",
   "size_bytes": 770380,
   "parameter_count": 191853,
