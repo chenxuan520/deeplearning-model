@@ -456,3 +456,16 @@ Dirichlet 与按局 seed 在 workers=1/8 下结果一致；版本化
 总27/40=67.5%，122秒。总胜率小幅提高，耗时下降34.8%。原始日志：
 `runtime/reuse_final_l6_s48_r{0,1}.log`。该复测证明安全收敛没有吃掉复用收益；
 但它仍是低预算优化，不等价于600-sim正式强度。
+
+### 主训练无损切换到安全协议
+
+旧成熟 trainer 在 iter420 已完成 net/optimizer/state、gate(10:10)与周期 replay
+落盘后退出；watchdog 用批准版二进制从 iter420/step83280 恢复。旧进程已经开始但
+未提交的 iter421 自对弈被安全重做，不进入持久状态。
+
+新 trainer 在 iter421 完成首次 legacy 迁移，原子 pointer 为 `421 0 421`：
+latest generation421、迁移后的 legacy best generation0、replay generation421；
+对应 replay 文件约860MiB，兼容 `latest.net/best.net/buffer.bin` 是同 inode 别名。
+plateau monitor 随后确认 `checkpoint_iter=421`、`condition_checkpoint_current=true`
+和 `condition_iteration_complete=true`。旧日志没有 `iteration_complete`，因此30轮
+未晋级计数从新协议的完整轮重新累计；这是故意的保守重置，宁可多训也不误停。
