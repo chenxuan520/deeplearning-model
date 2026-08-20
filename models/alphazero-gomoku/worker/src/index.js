@@ -5,6 +5,7 @@ const CORS_HEADERS = {
 };
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
+const CHANNEL_CACHE = "public, max-age=60, must-revalidate";
 
 function withHeaders(response, requestUrl) {
   const wrapped = new Response(response.body, response);
@@ -28,6 +29,10 @@ function withHeaders(response, requestUrl) {
           ? "image/png"
           : "application/octet-stream",
     );
+  } else if (requestUrl.pathname === "/model.json" ||
+             requestUrl.pathname.startsWith("/channels/")) {
+    wrapped.headers.set("cache-control", CHANNEL_CACHE);
+    wrapped.headers.set("content-type", "application/json; charset=utf-8");
   } else if (requestUrl.pathname.endsWith(".json")) {
     wrapped.headers.set("cache-control", "public, max-age=300");
     wrapped.headers.set("content-type", "application/json; charset=utf-8");
@@ -47,7 +52,12 @@ export default {
         headers: CORS_HEADERS,
       });
     }
-    const response = await env.ASSETS.fetch(request);
+    let assetRequest = request;
+    if (url.pathname === "/model.json") {
+      const stable = new URL("/channels/stable.json", url);
+      assetRequest = new Request(stable, request);
+    }
+    const response = await env.ASSETS.fetch(assetRequest);
     return withHeaders(response, url);
   },
 };

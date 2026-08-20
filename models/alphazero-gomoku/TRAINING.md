@@ -182,7 +182,7 @@ L1-L6 各 50 局的横评中，iter330 总胜率 64.3%、黑方 85.3%，高于�
 
 Cloudflare 仅静态托管参数与 JS：
 
-- `model.json`
+- `channels/stable.json`（`model.json` 仅为 Worker 兼容别名）
 - `champion_final-348b1b34.net`
 - `alphazero-gomoku-3412a43b.js`
 

@@ -1,4 +1,6 @@
 {
+  "channel": "stable",
+  "release": "v1.1.0",
   "format": "XQPVRN01",
   "version": 1,
   "file": "https://azgomoku.011203.xyz/fast-iter4-1bbd8634.net",
@@ -17,7 +19,7 @@
     "policy_size": 225,
     "value_channels": 1,
     "value_hidden_dim": 64,
-    "batch_norm_epsilon": 0.00001
+    "batch_norm_epsilon": 1e-05
   },
   "input_planes": [
     "current_player_stones",

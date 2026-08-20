@@ -26,14 +26,15 @@
   （独立构建，含规则、网络、MCTS、自对弈、训练器、门禁与测试）；本目录的
   `source/` 仅保留 v1.0.0 发布时源码快照。
 
-网页端应直接 `fetch()` 二进制文件，按 `public/model.json` 描述解析各层参数，完成
+网页端应直接 `fetch()` 二进制文件，按 `public/channels/stable.json` 描述解析各层参数，完成
 Conv2D / BatchNorm / ReLU / ResidualBlock / policy-value heads 前向，再在
 浏览器本地运行 PUCT MCTS；不依赖服务器前向计算。
 
 Cloudflare 静态模型地址由本目录 `worker/` 独立部署。它只负责分发参数，
 不运行网络前向或 MCTS。
 
-- Manifest: `https://azgomoku.011203.xyz/model.json`
+- Stable channel: `https://azgomoku.011203.xyz/channels/stable.json`
+- Compatibility alias: `https://azgomoku.011203.xyz/model.json`（由 Worker 映射到 stable）
 - Weights: `https://azgomoku.011203.xyz/fast-iter4-1bbd8634.net`
 - Browser engine: `https://azgomoku.011203.xyz/alphazero-gomoku-3412a43b.js`
 - Browser MCTS：严格有界子树复用；重开/悔棋取消旧搜索，node/edge 超限自动
@@ -46,6 +47,19 @@ v1.1.0 fast 模型完整门禁：
 - 600 sims：对 iter440 直接40:0；L6/L7 25局/颜色为100/96/100/100；
 - 600 sims：对晋升快照iter360同样40:0（执黑/白均20/20）；
 - 48-sim标准噪声对 iter330–435 六个晋升代际：五胜一平零负，合计177:123。
+
+后续晋升模型时，电子书与 game-old 不再改代码；它们永远读取 stable 通道。
+只需在本目录运行：
+
+```bash
+python3 tools/promote_stable.py \
+  --model /path/to/candidate.net \
+  --label fast-iterN --release vX.Y.Z \
+  --variant "description" --deploy
+```
+
+脚本会校验模型头、生成内容寻址文件、原子更新 stable manifest、部署 Worker，
+并回读线上 manifest/权重验证 SHA 与大小。
 
 快速构建与验证：
 

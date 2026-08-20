@@ -13,8 +13,6 @@ node_modules/
 *.net
 
 # Explicitly published small browser models under models/ are allowed.
-!models/alphazero-gomoku/public/champion_final-348b1b34.net
-!models/alphazero-gomoku/public/iter330-c4f41fcb.net
-!models/alphazero-gomoku/public/fast-iter4-1bbd8634.net
+!models/alphazero-gomoku/public/*.net
 models/alphazero-gomoku/source/build/
 models/alphazero-gomoku/source/bin/
