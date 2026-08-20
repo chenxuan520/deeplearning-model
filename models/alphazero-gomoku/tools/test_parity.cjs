@@ -4,7 +4,9 @@
 const fs = require("fs");
 const path = require("path");
 const { execFileSync } = require("child_process");
-const AZ = require("../public/alphazero-gomoku-b5cd1abe.js");
+const ENGINE = process.env.AZ_ENGINE ||
+  path.join(__dirname, "..", "public", "alphazero-gomoku-3412a43b.js");
+const AZ = require(ENGINE);
 
 const ROOT = path.resolve(__dirname, "..");
 const MODEL = path.join(ROOT, "public", "champion_final-348b1b34.net");
@@ -62,6 +64,49 @@ async function main() {
     console.log(JSON.stringify({ moves, sims, jsAction: js.action, cppAction: cpp.mcts_action }));
     if (js.action !== cpp.mcts_action) throw new Error(`MCTS parity failed for ${moves}`);
   }
+
+  const reuseState = AZ.createState();
+  for (const action of [112, 113, 97, 98]) AZ.applyMove(reuseState, action);
+  const session = new AZ.SearchSession({ maxNodes: 1000, maxEdges: 10000 });
+  const first = await AZ.search(model, reuseState,
+    { simulations: 24, yieldEvery: 25, session });
+  AZ.applyMove(reuseState, first.action);
+  if (!session.advance(first.action)) throw new Error("failed to advance reused tree");
+  const second = await AZ.search(model, reuseState,
+    { simulations: 12, yieldEvery: 13, session });
+  if (!second.reused || second.inheritedVisits <= 0)
+    throw new Error("subtree visits were not inherited");
+  console.log(JSON.stringify({ reuse: second.reused,
+    inheritedVisits: second.inheritedVisits, nodes: second.nodeCount,
+    edges: second.edgeCount }));
+
+  const cancelledSession = new AZ.SearchSession();
+  const cancelledPromise = AZ.search(model, reuseState,
+    { simulations: 200, yieldEvery: 1, session: cancelledSession });
+  setTimeout(() => cancelledSession.reset(), 0);
+  const cancelled = await cancelledPromise;
+  if (!cancelled.cancelled) throw new Error("session reset did not cancel search");
+
+  const boundedSession = new AZ.SearchSession({ maxNodes: 12, maxEdges: 100 });
+  const bounded = await AZ.search(model, reuseState,
+    { simulations: 200, yieldEvery: 201, session: boundedSession });
+  if (!bounded.budgetExhausted || bounded.nodeCount > 12 ||
+      bounded.edgeCount > boundedSession.maxEdges || bounded.action < 0)
+    throw new Error(`MCTS budget escaped: ${JSON.stringify(bounded)}`);
+  AZ.applyMove(reuseState, bounded.action);
+  if (boundedSession.advance(bounded.action))
+    throw new Error("exhausted search cache was retained");
+  const afterExhaustion = await AZ.search(model, reuseState,
+    { simulations: 8, yieldEvery: 9, session: boundedSession });
+  if (afterExhaustion.cancelled || afterExhaustion.action < 0 ||
+      afterExhaustion.inheritedVisits !== 0)
+    throw new Error("search did not recover fresh after budget exhaustion");
+
+  const tinyEdgeSession = new AZ.SearchSession({ maxNodes: 50, maxEdges: 1 });
+  const tinyEdge = await AZ.search(model, reuseState,
+    { simulations: 1, yieldEvery: 2, session: tinyEdgeSession });
+  if (tinyEdge.action < 0 || tinyEdgeSession.maxEdges !== 225)
+    throw new Error("root edge budget cannot represent legal root moves");
 
   console.log(`PASS worstLogit=${worstLogit} worstValue=${worstValue}`);
 }

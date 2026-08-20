@@ -19,7 +19,7 @@ Cloudflare 静态模型地址由本目录 `worker/` 独立部署。它只负责�
 
 - Manifest: `https://azgomoku.011203.xyz/model.json`
 - Weights: `https://azgomoku.011203.xyz/champion_final-348b1b34.net`
-- Browser engine: `https://azgomoku.011203.xyz/alphazero-gomoku-b5cd1abe.js`
+- Browser engine: `https://azgomoku.011203.xyz/alphazero-gomoku-3412a43b.js`
 
 快速构建与验证：
 

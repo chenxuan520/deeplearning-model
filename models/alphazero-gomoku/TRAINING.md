@@ -170,10 +170,15 @@ Cloudflare 仅静态托管参数与 JS：
 
 - `model.json`
 - `champion_final-348b1b34.net`
-- `alphazero-gomoku-b5cd1abe.js`
+- `alphazero-gomoku-3412a43b.js`
 
 浏览器端直接解析 C++ `.net` 文件，运行 Conv2D、BN、残差网络、策略/价值双头及
 PUCT MCTS。没有服务器前向计算。
+
+浏览器 MCTS 使用严格有界的 `SearchSession`：真实落子后继承对应 child subtree，
+重开/悔棋通过代数令牌立即取消旧搜索；node/edge 超预算时丢弃缓存并 fresh 重建。
+离线压力测试覆盖 8 局 152 手，144 次命中复用，最大 43 nodes / 2785 edges，
+强制 GC 后堆增长约 0.25MB。
 
 JS/C++ 一致性测试覆盖 4 个棋盘：
 

@@ -2,7 +2,7 @@
   "format": "XQPVRN01",
   "version": 1,
   "file": "https://azgomoku.011203.xyz/iter330-c4f41fcb.net",
-  "engine": "https://azgomoku.011203.xyz/alphazero-gomoku-b5cd1abe.js",
+  "engine": "https://azgomoku.011203.xyz/alphazero-gomoku-3412a43b.js",
   "training_curve": "https://azgomoku.011203.xyz/policy_loss_analysis-iter434-44e7fad3.png",
   "sha256": "c4f41fcba6acd9f0956a5f64c0a80762fc21b9871b5ef429d3335ecfa47275dc",
   "size_bytes": 770380,
