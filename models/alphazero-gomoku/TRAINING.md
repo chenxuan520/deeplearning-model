@@ -195,7 +195,7 @@ node tools/test_parity.cjs
 ## 9. 训练记录
 
 - `training/TRAINING_NOTES.md`：完整巡检、故障与调参决策；
-- `training/policy_loss_analysis.png`：截至 iter434 的 policy/value loss、滑动均线、晋级线与拟合；
+- `training/policy_loss_analysis.png`：截至主线收口 iter440 的 policy/value loss、滑动均线、晋级线与拟合；
 - `training/policy_loss_history.csv`：逐轮原始数据；
 - `training/policy_loss_fit.json`：拟合参数。
 

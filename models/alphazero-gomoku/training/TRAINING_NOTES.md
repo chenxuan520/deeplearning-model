@@ -20,7 +20,7 @@
 
 - 浏览器移植审查发现：网络输入第 3 平面包含上一手，但 `EvalCache` key 只含行棋方与棋盘，导致相同棋盘/不同上一手错误碰撞；hard curriculum 从 replay 重构局面时也把上一手清成 -1。
 - 修复：cache key 纳入 `last_action` 并对完整 key 做 64 分片哈希；残局从 sample plane2 恢复唯一上一手。
-- 新增缓存碰撞与 `SetState(last_action)` 编码测试；当前 **4411 checks, 0 failed**。
+- 新增缓存碰撞与 `SetState(last_action)` 编码测试；当前 **4100 checks, 0 failed**。
 - iter332/step65680 是修复前最后完整 checkpoint；watchdog 已用修复后二进制从该点续训。
 
 ## 2026-08-12 · 修复后的正轨期（从 iter 13 起）
@@ -470,11 +470,21 @@ plateau monitor 随后确认 `checkpoint_iter=421`、`condition_checkpoint_curre
 和 `condition_iteration_complete=true`。旧日志没有 `iteration_complete`，因此30轮
 未晋级计数从新协议的完整轮重新累计；这是故意的保守重置，宁可多训也不误停。
 
-### 训练曲线刷新到 iter434（2026-08-20）
+## 主线训练在 iter440 人工收口（2026-08-20）
 
-重新从完整 `train.log` 生成 434 个去重 `train_done` 点：最新 policy loss
-2.6689、value loss 1.1924、policy rolling-5 为 2.65484。新 PNG/SVG 同时展示
-完整 policy 曲线、iter100+ 渐近拟合、最近线性趋势及独立 value-head 历史；
-CSV、拟合 JSON、PNG/SVG 均以同一份 434 点数据生成。公开 PNG 使用内容寻址名
-`policy_loss_analysis-iter434-44e7fad3.png`，SHA-256 为
-`44e7fad30903f6ab3ee1ea8f04f211c3b441fa4f1fe300cf3301484b08fd3cda`。
+用户在比较 iter415 与 iter360 后确认主线收益已很低，授权在 iter440 没有意外时
+停止。对照结果：48 sims 下 iter415 23:27 小负 iter360；600 sims 下双方25:25，
+高预算强度无可见提升。iter435 的12:8晋级也被判定为20局 gate 的高方差，而非
+实质突破。
+
+iter440 完成80局自对弈、200训练步、随机基线20:0、gate 10:10；policy loss
+2.6492、value loss1.1161，没有刷新 policy 历史最低2.6133@iter424。版本化 pointer
+`440 435 440` 与 net/best/replay 全部落盘后，trainer 通过 nonce 暂停握手写
+`plateau_stop_ack` 干净退出；watchdog/monitor 随后退出，无外部 kill。
+
+全程产生455个 selfplay_done 事件、35,000局实际自对弈；去掉重启重复轮为440个
+唯一 iteration、33,920局，约133万局面、87,280次Adam更新。最终快照：
+`runtime/final_iter440.net`(SHA-256
+`66aa74b70cd2a73b1c61616df13aaa4a61073d3c5cdf10c1979084212827b2c4`)，
+停止时 gate best 为 iter435。该停止是用户基于实测收益的人工收口，不冒充原三条件
+自动平台验收通过。
