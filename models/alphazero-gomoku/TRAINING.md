@@ -1,5 +1,11 @@
 # AlphaZero 五子棋训练档案
 
+> **主线已收口。** 训练在 iter440 完整 gate/checkpoint/replay 边界人工停止，
+> 共33,920局去重自对弈（含重启实际35,000局）、约133万局面、87,280次Adam
+> 更新。最终 loss 为 policy 2.6492 / value 1.1161；历史 policy 最低为
+> 2.6133@iter424。最终图见 `training/policy_loss_analysis.png`，公开内容寻址图为
+> `policy_loss_analysis-iter440-288738d2.png`。
+
 这份模型的状态、π 与 z 完全由 **AlphaZero/AlphaGo Zero 风格的自对弈**产生：
 
 - 不使用棋谱监督学习；
