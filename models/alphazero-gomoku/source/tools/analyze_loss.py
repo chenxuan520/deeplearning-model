@@ -219,7 +219,11 @@ def main():
     )
 
     with OUT_CSV.open("w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["iteration", "step", "policy_loss", "value_loss", "rolling5"])
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["iteration", "step", "policy_loss", "value_loss", "rolling5"],
+            lineterminator="\n",
+        )
         writer.writeheader()
         for row, roll in zip(rows, rolling):
             writer.writerow({**row, "rolling5": f"{roll:.6f}"})

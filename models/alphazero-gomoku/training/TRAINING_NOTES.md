@@ -20,7 +20,7 @@
 
 - 浏览器移植审查发现：网络输入第 3 平面包含上一手，但 `EvalCache` key 只含行棋方与棋盘，导致相同棋盘/不同上一手错误碰撞；hard curriculum 从 replay 重构局面时也把上一手清成 -1。
 - 修复：cache key 纳入 `last_action` 并对完整 key 做 64 分片哈希；残局从 sample plane2 恢复唯一上一手。
-- 新增缓存碰撞与 `SetState(last_action)` 编码测试；当前 **4100 checks, 0 failed**。
+- 新增缓存碰撞与 `SetState(last_action)` 编码测试；当前 **4411 checks, 0 failed**。
 - iter332/step65680 是修复前最后完整 checkpoint；watchdog 已用修复后二进制从该点续训。
 
 ## 2026-08-12 · 修复后的正轨期（从 iter 13 起）
@@ -469,3 +469,12 @@ latest generation421、迁移后的 legacy best generation0、replay generation4
 plateau monitor 随后确认 `checkpoint_iter=421`、`condition_checkpoint_current=true`
 和 `condition_iteration_complete=true`。旧日志没有 `iteration_complete`，因此30轮
 未晋级计数从新协议的完整轮重新累计；这是故意的保守重置，宁可多训也不误停。
+
+### 训练曲线刷新到 iter434（2026-08-20）
+
+重新从完整 `train.log` 生成 434 个去重 `train_done` 点：最新 policy loss
+2.6689、value loss 1.1924、policy rolling-5 为 2.65484。新 PNG/SVG 同时展示
+完整 policy 曲线、iter100+ 渐近拟合、最近线性趋势及独立 value-head 历史；
+CSV、拟合 JSON、PNG/SVG 均以同一份 434 点数据生成。公开 PNG 使用内容寻址名
+`policy_loss_analysis-iter434-44e7fad3.png`，SHA-256 为
+`44e7fad30903f6ab3ee1ea8f04f211c3b441fa4f1fe300cf3301484b08fd3cda`。

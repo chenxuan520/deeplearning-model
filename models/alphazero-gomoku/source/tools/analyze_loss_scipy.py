@@ -148,6 +148,8 @@ def main():
     value = np.array([float(row["value_loss"]) for row in rows])
     rolling5 = rolling_mean(policy, 5)
     rolling15 = rolling_mean(policy, 15)
+    value_rolling5 = rolling_mean(value, 5)
+    value_rolling15 = rolling_mean(value, 15)
     asymptotes = fit_asymptotes(iterations, policy, fit_start=100)
     linear40 = linear_fit(iterations, policy, min(40, len(rows)))
     linear80 = linear_fit(iterations, policy, min(80, len(rows)))
@@ -158,9 +160,13 @@ def main():
         "points": len(rows),
         "latest_iteration": current,
         "latest_policy_loss": float(policy[-1]),
+        "latest_value_loss": float(value[-1]),
         "minimum_policy_loss": float(np.min(policy)),
+        "minimum_value_loss": float(np.min(value)),
         "rolling5_latest": float(rolling5[-1]),
         "rolling15_latest": float(rolling15[-1]),
+        "value_rolling5_latest": float(value_rolling5[-1]),
+        "value_rolling15_latest": float(value_rolling15[-1]),
         "fit_start": asymptotes["fit_start"],
         "exponential": serializable(asymptotes["exp"]),
         "power": serializable(asymptotes["power"]),
@@ -183,8 +189,9 @@ def main():
     OUT_JSON.write_text(json.dumps(report, indent=2), encoding="utf-8")
 
     plt.style.use("dark_background")
-    fig, (ax1, ax2, ax3) = plt.subplots(
-        3, 1, figsize=(16, 12), gridspec_kw={"height_ratios": [2.3, 1.4, 1.2]}
+    fig, (ax1, ax2, ax3, ax4) = plt.subplots(
+        4, 1, figsize=(16, 15),
+        gridspec_kw={"height_ratios": [2.3, 1.4, 1.2, 1.25]}
     )
     fig.suptitle(
         f"AlphaZero Gomoku training loss — {len(rows)} complete iterations",
@@ -236,8 +243,26 @@ def main():
     ax3.grid(alpha=0.18)
     ax3.legend(ncol=2)
 
+    # Full value-head loss history.  This is intentionally shown separately:
+    # policy and value have different scales and answer different questions.
+    ax4.scatter(iterations, value, s=12, alpha=0.38, color="#22d3ee",
+                label="value loss")
+    ax4.plot(iterations, value_rolling5, lw=2.2, color="#f59e0b",
+             label="value rolling mean (5)")
+    ax4.plot(iterations, value_rolling15, lw=1.5, color="#f472b6",
+             alpha=0.9, label="value rolling mean (15)")
+    for gate in promotions:
+        ax4.axvline(gate, color="#22c55e", alpha=0.18, lw=1)
+    ax4.axvline(current, color="#94a3b8", ls=":", lw=1)
+    ax4.set_xlabel("training iteration")
+    ax4.set_ylabel("value loss")
+    ax4.set_title("Value-head loss history (MSE against final self-play outcome)")
+    ax4.grid(alpha=0.18)
+    ax4.legend(ncol=3)
+
     text = (
-        f"Latest: iter {current}, policy={policy[-1]:.4f}, rolling5={rolling5[-1]:.4f} | "
+        f"Latest: iter {current}, policy={policy[-1]:.4f}, value={value[-1]:.4f}, "
+        f"policy rolling5={rolling5[-1]:.4f} | "
         f"linear40 slope={linear40['slope']:.6f}/iter | "
         "Training recipe changed over time; extrapolation uncertainty is high."
     )
@@ -245,6 +270,13 @@ def main():
     fig.tight_layout(rect=(0, 0.035, 1, 0.965))
     fig.savefig(OUT_PNG, dpi=160)
     fig.savefig(OUT_SVG)
+    # Matplotlib writes multiline SVG path data with trailing spaces. Keep the
+    # published text artifact deterministic and git-diff clean.
+    svg = OUT_SVG.read_text(encoding="utf-8")
+    OUT_SVG.write_text(
+        "\n".join(line.rstrip() for line in svg.splitlines()) + "\n",
+        encoding="utf-8",
+    )
     print(json.dumps(report, indent=2))
     print(OUT_PNG)
 
