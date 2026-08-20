@@ -6,6 +6,14 @@
 > 2.6133@iter424。最终图见 `training/policy_loss_analysis.png`，公开内容寻址图为
 > `policy_loss_analysis-iter440-288738d2.png`。
 
+> **v1.1.0 low-sim fast 模型**：冻结 iter440 的 trunk/value/BN，仅蒸馏
+> policy head；fast iter4 SHA-256
+> `1bbd86347ee4942f8b99c9732f8afbd20c896bd5ef703eac87f11f45dedb26ad`。
+> 48-sim(reuse) L6黑/白88%/56%、L7 100%/100%；96-sim L6
+> 96%/76%、L7 100%/100%；600-sim 对 iter440 直接40:0，L6/L7
+> 25局/颜色最大回退4pp。完整实验见 standalone 仓库
+> `FAST_POLICY_DISTILLATION.md`。
+
 这份模型的状态、π 与 z 完全由 **AlphaZero/AlphaGo Zero 风格的自对弈**产生：
 
 - 不使用棋谱监督学习；

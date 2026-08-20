@@ -1,10 +1,10 @@
 {
   "format": "XQPVRN01",
   "version": 1,
-  "file": "https://azgomoku.011203.xyz/iter330-c4f41fcb.net",
+  "file": "https://azgomoku.011203.xyz/fast-iter4-1bbd8634.net",
   "engine": "https://azgomoku.011203.xyz/alphazero-gomoku-3412a43b.js",
   "training_curve": "https://azgomoku.011203.xyz/policy_loss_analysis-iter440-288738d2.png",
-  "sha256": "c4f41fcba6acd9f0956a5f64c0a80762fc21b9871b5ef429d3335ecfa47275dc",
+  "sha256": "1bbd86347ee4942f8b99c9732f8afbd20c896bd5ef703eac87f11f45dedb26ad",
   "size_bytes": 770380,
   "parameter_count": 191853,
   "config": {
@@ -25,5 +25,6 @@
     "last_move",
     "black_to_move"
   ],
-  "rules": "15x15 freestyle gomoku; five-or-more wins; no forbidden moves"
+  "rules": "15x15 freestyle gomoku; five-or-more wins; no forbidden moves",
+  "variant": "v1.1.0 low-simulation policy-distilled; iter440 trunk/value frozen; policy head only"
 }
