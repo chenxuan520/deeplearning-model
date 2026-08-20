@@ -11,7 +11,7 @@
 > `1bbd86347ee4942f8b99c9732f8afbd20c896bd5ef703eac87f11f45dedb26ad`。
 > 48-sim(reuse) L6黑/白88%/56%、L7 100%/100%；96-sim L6
 > 96%/76%、L7 100%/100%；600-sim 对 iter440 直接40:0，L6/L7
-> 25局/颜色最大回退4pp。完整实验见 standalone 仓库
+> 25局/颜色最大回退4pp；对晋升快照iter360也为40:0。完整实验见standalone仓库
 > `FAST_POLICY_DISTILLATION.md`。
 
 这份模型的状态、π 与 z 完全由 **AlphaZero/AlphaGo Zero 风格的自对弈**产生：
