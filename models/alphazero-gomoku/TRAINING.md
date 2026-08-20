@@ -207,17 +207,21 @@ node tools/test_parity.cjs
 
 ## 10. 完整源码复现
 
-`source/` 是本次独立项目的源码快照，不依赖 PyTorch/TensorFlow：
+权威源码位于独立仓库
+[chenxuan520/alphazero-gomoku](https://github.com/chenxuan520/alphazero-gomoku)，
+不依赖 PyTorch/TensorFlow；本目录 `source/` 仅保留 v1.0.0 发布时快照：
 
 ```bash
-cmake -S source -B source/build -DCMAKE_BUILD_TYPE=Release
-cmake --build source/build -j
-source/bin/test_az                         # 4411 checks, 0 failures
-source/bin/alphazero info
+git clone https://github.com/chenxuan520/alphazero-gomoku
+cd alphazero-gomoku
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./bin/test_az                              # 4411 checks, 0 failures
+./bin/alphazero info
 ```
 
 浏览器前向与 C++ 对齐：
 
 ```bash
-AZ_PROBE="$PWD/source/bin/az_model_probe" node tools/test_parity.cjs
+AZ_PROBE=/path/to/alphazero-gomoku/bin/az_model_probe node tools/test_parity.cjs
 ```

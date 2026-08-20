@@ -20,7 +20,9 @@
 - 参数量：191,853
 - 文件大小：770,380 bytes
 - SHA-256：`348b1b3448ded9f32d7738cb31cbbe3739c819c54e2b20b29e266dc4780345f4`
-- C++ 源码：`source/`（可独立 CMake 构建，含规则、网络、MCTS、自对弈、训练器、门禁、测试）
+- C++ 源码：[chenxuan520/alphazero-gomoku](https://github.com/chenxuan520/alphazero-gomoku)
+  （独立构建，含规则、网络、MCTS、自对弈、训练器、门禁与测试）；本目录的
+  `source/` 仅保留 v1.0.0 发布时源码快照。
 
 网页端应直接 `fetch()` 二进制文件，按 `public/model.json` 描述解析各层参数，完成
 Conv2D / BatchNorm / ReLU / ResidualBlock / policy-value heads 前向，再在
@@ -38,9 +40,13 @@ Cloudflare 静态模型地址由本目录 `worker/` 独立部署。它只负责�
 快速构建与验证：
 
 ```bash
-cmake -S source -B source/build -DCMAKE_BUILD_TYPE=Release
-cmake --build source/build -j
-source/bin/test_az
-AZ_PROBE="$PWD/source/bin/az_model_probe" node tools/test_parity.cjs
+git clone https://github.com/chenxuan520/alphazero-gomoku
+cd alphazero-gomoku
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build -j
+./bin/test_az
+
+# 回到 deeplearning-model/models/alphazero-gomoku 后做 JS/C++ 对齐
+AZ_PROBE=/path/to/alphazero-gomoku/bin/az_model_probe node tools/test_parity.cjs
 node --expose-gc tools/test_reuse_stress.cjs
 ```
