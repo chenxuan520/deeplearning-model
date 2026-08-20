@@ -1,12 +1,12 @@
 {
-  "channel": "stable",
-  "release": "v1.0.0",
+  "channel": "fast",
+  "release": "v1.1.0",
   "format": "XQPVRN01",
   "version": 1,
-  "file": "https://azgomoku.011203.xyz/iter440-66aa74b7.net",
+  "file": "https://azgomoku.011203.xyz/fast-iter4-1bbd8634.net",
   "engine": "https://azgomoku.011203.xyz/alphazero-gomoku-3412a43b.js",
   "training_curve": "https://azgomoku.011203.xyz/policy_loss_analysis-iter440-288738d2.png",
-  "sha256": "66aa74b70cd2a73b1c61616df13aaa4a61073d3c5cdf10c1979084212827b2c4",
+  "sha256": "1bbd86347ee4942f8b99c9732f8afbd20c896bd5ef703eac87f11f45dedb26ad",
   "size_bytes": 770380,
   "parameter_count": 191853,
   "config": {
@@ -28,5 +28,5 @@
     "black_to_move"
   ],
   "rules": "15x15 freestyle gomoku; five-or-more wins; no forbidden moves",
-  "variant": "iter440 round-robin winner; 48-sim production stable"
+  "variant": "low-simulation policy-distilled; iter440 trunk/value frozen; policy head only"
 }

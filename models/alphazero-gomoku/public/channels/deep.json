@@ -1,5 +1,5 @@
 {
-  "channel": "stable",
+  "channel": "deep",
   "release": "v1.0.0",
   "format": "XQPVRN01",
   "version": 1,
@@ -28,5 +28,5 @@
     "black_to_move"
   ],
   "rules": "15x15 freestyle gomoku; five-or-more wins; no forbidden moves",
-  "variant": "iter440 round-robin winner; 48-sim production stable"
+  "variant": "iter440 mainline final; high-budget regression baseline"
 }

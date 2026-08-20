@@ -10,7 +10,7 @@
 |------|------|--------|------|------|----------|
 | [sanguo-mini-lm](models/sanguo-mini-lm/) | 字符级中文语言模型（utf8-char） | ~182 万 | 《三國志演義》简体清洗版 57 万字（Gutenberg #23950，公有领域） | loss 3.62 / ppl 37.2 | [网页 & OpenAI 兼容 API](https://minilm.011203.xyz) |
 | [xiangqi-8992](models/xiangqi-8992/) | 象棋 policy/value ResNet + PUCT | 484 万 | 授权/自有/公开象棋棋谱 + 16 局 512-PUCT 自博弈 | vs 8991: 24-13-13；gentle: 0-12-0 | 本地 8992 端口；Cloudflare Worker 不适合直接推理 |
-| [alphazero-gomoku](models/alphazero-gomoku/) | 15×15 五子棋 AlphaZero Policy-Value ResNet + PUCT | 19.2 万 | 纯自对弈 + 冻结600-sim教师policy蒸馏 | fast@48晋升谱59%；L6@96 86%；600-sim对iter440 40:0 | 浏览器本地前向 + 有界复用 MCTS（模型静态托管于 Cloudflare） |
+| [alphazero-gomoku](models/alphazero-gomoku/) | 15×15 五子棋 AlphaZero Policy-Value ResNet + PUCT | 19.2 万 | 纯自对弈 + 可选冻结600-sim教师policy蒸馏 | stable=iter440（48-sim全循环第一）；fast=v1.1 policy蒸馏版 | 浏览器本地前向 + 有界复用 MCTS（固定stable通道） |
 
 ## 目录约定
 

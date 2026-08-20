@@ -12,12 +12,12 @@ import sys
 import tempfile
 import time
 import urllib.request
+import urllib.error
 from pathlib import Path
 
 
 MODEL_DIR = Path(__file__).resolve().parents[1]
 PUBLIC_DIR = MODEL_DIR / "public"
-CHANNEL_FILE = PUBLIC_DIR / "channels" / "stable.json"
 PUBLIC_BASE = "https://azgomoku.011203.xyz"
 
 
@@ -158,8 +158,9 @@ def fetch_sha(url):
     return digest.hexdigest(), size
 
 
-def verify_online(manifest, digest, size):
-    channel_url = PUBLIC_BASE + "/channels/stable.json?cb=%d" % int(time.time())
+def verify_online(channel, manifest, digest, size):
+    channel_url = "%s/channels/%s.json?cb=%d" % (
+        PUBLIC_BASE, channel, int(time.time()))
     last_error = None
     # Static Asset propagation can briefly return the previous generation or
     # a 404 immediately after Wrangler reports success. Retry the readback;
@@ -180,12 +181,38 @@ def verify_online(manifest, digest, size):
     raise ValueError("online verification failed after retries: %s" % last_error)
 
 
+def verify_online_absent(channel):
+    url = "%s/channels/%s.json?cb=%d" % (
+        PUBLIC_BASE, channel, int(time.time()))
+    last_error = None
+    for attempt in range(12):
+        try:
+            request = urllib.request.Request(
+                url + "-%d" % attempt,
+                headers={"User-Agent": "az-promote/1.0"})
+            with urllib.request.urlopen(request, timeout=30) as response:
+                raise ValueError("removed channel still returns HTTP %d" %
+                                 response.status)
+        except urllib.error.HTTPError as error:
+            if error.code == 404:
+                return
+            last_error = error
+        except Exception as error:
+            last_error = error
+        if attempt + 1 < 12:
+            time.sleep(min(2 + attempt, 10))
+    raise ValueError("removed channel still visible after rollback: %s" %
+                     last_error)
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--model", required=True, type=Path)
     parser.add_argument("--label", required=True)
     parser.add_argument("--release", required=True)
     parser.add_argument("--variant", required=True)
+    parser.add_argument("--channel", choices=("stable", "fast", "deep"),
+                        default="stable")
     parser.add_argument("--deploy", action="store_true")
     args = parser.parse_args()
 
@@ -195,9 +222,15 @@ def main():
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", args.label):
         raise SystemExit("label must match [a-z0-9][a-z0-9-]*")
 
-    previous_manifest = json.loads(CHANNEL_FILE.read_text(encoding="utf-8"))
+    channel_file = PUBLIC_DIR / "channels" / (args.channel + ".json")
+    previous_manifest = None
+    if channel_file.exists():
+        previous_manifest = json.loads(channel_file.read_text(encoding="utf-8"))
+    template_file = channel_file if previous_manifest is not None else \
+                    PUBLIC_DIR / "channels" / "stable.json"
+    template_manifest = json.loads(template_file.read_text(encoding="utf-8"))
     staged, header, digest, staged_size = stage_model(model)
-    manifest = dict(previous_manifest)
+    manifest = dict(template_manifest)
     expected = manifest["config"]
     for key in (
         "input_channels", "board_height", "board_width", "trunk_channels",
@@ -219,17 +252,17 @@ def main():
         os.replace(str(staged), str(destination))
 
     manifest.update({
-        "channel": "stable",
+        "channel": args.channel,
         "release": args.release,
         "file": "%s/%s" % (PUBLIC_BASE, asset_name),
         "sha256": digest,
         "size_bytes": staged_size,
         "variant": args.variant,
     })
-    atomic_json(CHANNEL_FILE, manifest)
+    atomic_json(channel_file, manifest)
 
     print("asset:", destination)
-    print("stable:", CHANNEL_FILE)
+    print("channel:", channel_file)
     print("sha256:", digest)
 
     if not args.deploy:
@@ -237,15 +270,25 @@ def main():
     try:
         subprocess.run(["npx", "wrangler", "deploy"], cwd=MODEL_DIR / "worker",
                        check=True)
-        verify_online(manifest, digest, staged_size)
+        verify_online(args.channel, manifest, digest, staged_size)
     except Exception:
-        print("deployment verification failed; rolling stable channel back",
+        print("deployment verification failed; rolling channel back",
               file=sys.stderr)
-        atomic_json(CHANNEL_FILE, previous_manifest)
+        if previous_manifest is None:
+            try:
+                channel_file.unlink()
+            except FileNotFoundError:
+                pass
+        else:
+            atomic_json(channel_file, previous_manifest)
         subprocess.run(["npx", "wrangler", "deploy"], cwd=MODEL_DIR / "worker",
                        check=True)
-        verify_online(previous_manifest, previous_manifest["sha256"],
-                      previous_manifest["size_bytes"])
+        if previous_manifest is not None:
+            verify_online(args.channel, previous_manifest,
+                          previous_manifest["sha256"],
+                          previous_manifest["size_bytes"])
+        else:
+            verify_online_absent(args.channel)
         raise
     print("online verification: OK")
 
